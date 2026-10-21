@@ -149,26 +149,7 @@
                 </div>
             </div>
 
-            <!-- API 고급 설정 (버전/엔드포인트 변경 대비) -->
-            <div class="pt-1 border-t border-slate-800/80">
-                <button type="button" onclick="toggleAdvancedSettings()" class="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-200 transition-colors py-0.5">
-                    <span class="flex items-center gap-1">
-                        <i data-lucide="settings-2" class="w-3 h-3"></i>
-                        <span>API 고급 설정</span>
-                    </span>
-                    <i data-lucide="chevron-down" id="adv-chevron" class="w-3 h-3 transition-transform duration-200"></i>
-                </button>
-                <div id="advanced-settings-panel" class="hidden flex-col gap-1.5 mt-1.5 p-2 bg-[#1e293b]/70 border border-slate-700/60 rounded-lg text-[11px]">
-                    <div class="flex flex-col gap-1">
-                        <span class="text-slate-400 text-[10px]">API 엔드포인트 URL</span>
-                        <input type="text" id="api-base-url" placeholder="https://generativelanguage.googleapis.com/v1beta"
-                            class="w-full bg-[#0f172a] border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-mono"
-                            oninput="saveApiBaseUrl()"
-                        >
-                    </div>
-                    <button type="button" onclick="resetApiBaseUrl()" class="text-[10px] text-slate-400 hover:text-amber-400 text-right underline">기본값으로 복원</button>
-                </div>
-            </div>
+
         </div>
     </aside>
 
@@ -345,55 +326,13 @@
         const API_KEY_STORAGE_KEY = 'smart_record_gemini_api_key';
         const MODEL_STORAGE_KEY = 'smart_record_gemini_model';
         const CUSTOM_MODEL_STORAGE_KEY = 'smart_record_gemini_custom_model';
-        const API_BASE_URL_STORAGE_KEY = 'smart_record_gemini_base_url';
-        const DEFAULT_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
+        const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
         const DEFAULT_MODEL = 'gemini-flash-lite-latest';
 
         let apiKeyDebounceTimer = null;
 
         function getStoredApiKey() {
             return (localStorage.getItem(API_KEY_STORAGE_KEY) || '').trim();
-        }
-
-        function getApiBaseUrl() {
-            const saved = (localStorage.getItem(API_BASE_URL_STORAGE_KEY) || '').trim();
-            return saved.replace(/\/+$/, '') || DEFAULT_ENDPOINT;
-        }
-
-        function saveApiBaseUrl() {
-            const input = document.getElementById('api-base-url');
-            if (!input) return;
-            const val = input.value.trim().replace(/\/+$/, '');
-            if (val && val !== DEFAULT_ENDPOINT) {
-                localStorage.setItem(API_BASE_URL_STORAGE_KEY, val);
-            } else {
-                localStorage.removeItem(API_BASE_URL_STORAGE_KEY);
-            }
-        }
-
-        function resetApiBaseUrl() {
-            const input = document.getElementById('api-base-url');
-            if (input) input.value = '';
-            localStorage.removeItem(API_BASE_URL_STORAGE_KEY);
-            showModal('설정 초기화', `API 엔드포인트가 공식 기본 주소로 복원되었습니다.<br><code class="text-xs text-blue-600 font-mono mt-1 block">${DEFAULT_ENDPOINT}</code>`, 'info');
-        }
-
-        function toggleAdvancedSettings() {
-            const panel = document.getElementById('advanced-settings-panel');
-            const chevron = document.getElementById('adv-chevron');
-            if (!panel) return;
-            const isHidden = panel.classList.contains('hidden');
-            if (isHidden) {
-                panel.classList.remove('hidden');
-                panel.classList.add('flex');
-                if (chevron) chevron.style.transform = 'rotate(180deg)';
-                const input = document.getElementById('api-base-url');
-                if (input) input.value = localStorage.getItem(API_BASE_URL_STORAGE_KEY) || '';
-            } else {
-                panel.classList.add('hidden');
-                panel.classList.remove('flex');
-                if (chevron) chevron.style.transform = 'rotate(0deg)';
-            }
         }
 
         function getSelectedModel() {
@@ -487,7 +426,7 @@
             const refreshBtn = document.getElementById('refresh-models-btn');
             if (refreshBtn) refreshBtn.classList.add('animate-spin');
 
-            const baseUrl = getApiBaseUrl();
+            const baseUrl = API_BASE_URL;
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey.startsWith('ya29.') || apiKey.startsWith('Bearer ')) {
                 headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
@@ -981,7 +920,7 @@ ${data.cases}
         async function callGeminiApiDirectly(payload, apiKey, retryCount = 0) {
             const systemPrompt = buildSystemPrompt(payload);
             let modelName = getSelectedModel();
-            const baseUrl = getApiBaseUrl();
+            const baseUrl = API_BASE_URL;
             const trimmedKey = apiKey.trim();
 
             const apiUrl = `${baseUrl}/models/${modelName}:generateContent?key=${encodeURIComponent(trimmedKey)}`;
