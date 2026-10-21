@@ -235,16 +235,38 @@
 
             <div id="loading-container" class="hidden-element flex flex-col gap-2 pb-4">
                 <div class="flex justify-between items-center px-1">
-                    <span id="loading-msg" class="text-[14px] font-bold text-blue-600">🔍 학생의 특성을 분석하는 중...</span>
-                    <span id="loading-percent" class="text-[13px] font-bold text-slate-500">0%</span>
+                    <span id="loading-msg" class="text-[14px] font-bold text-blue-600 flex items-center gap-1.5 transition-all">
+                        <span class="inline-block animate-spin text-[13px]">⏳</span>
+                        <span id="loading-msg-text">학생의 특성을 분석하는 중...</span>
+                    </span>
+                    <span id="loading-percent" class="text-[12px] font-extrabold text-blue-700 font-mono tracking-tight bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 shadow-xs">0%</span>
                 </div>
-                <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
-                    <div id="loading-bar" class="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full relative" style="width: 0%; transition: width 0.4s ease-out;">
-                        <div class="absolute top-0 left-0 right-0 bottom-0 bg-white/20" style="animation: shimmer 1.5s infinite; transform: skewX(-20deg);"></div>
+                <div class="w-full bg-slate-200/80 rounded-full h-3.5 overflow-hidden shadow-inner p-0.5 border border-slate-300/60 relative">
+                    <div id="loading-bar" class="h-full rounded-full relative animated-stripes transition-all duration-300 ease-out" style="width: 6%; min-width: 20px;">
+                        <div class="absolute inset-0 rounded-full opacity-50 animate-pulse bg-white/20"></div>
                     </div>
                 </div>
                 <style>
-                    @keyframes shimmer { 0% { transform: translateX(-100%) skewX(-20deg); } 100% { transform: translateX(200%) skewX(-20deg); } }
+                    @keyframes progress-stripes {
+                        0% { background-position: 36px 0; }
+                        100% { background-position: 0 0; }
+                    }
+                    .animated-stripes {
+                        background-image: linear-gradient(
+                            135deg,
+                            rgba(255, 255, 255, 0.28) 25%,
+                            transparent 25%,
+                            transparent 50%,
+                            rgba(255, 255, 255, 0.28) 50%,
+                            rgba(255, 255, 255, 0.28) 75%,
+                            transparent 75%,
+                            transparent
+                        );
+                        background-size: 28px 28px;
+                        background-color: #2563eb;
+                        animation: progress-stripes 0.8s linear infinite;
+                        box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+                    }
                 </style>
             </div>
             
@@ -1030,9 +1052,10 @@ ${data.cases}
             btn.classList.add('hidden-element');
             loadContainer.classList.remove('hidden-element');
 
-            loadBar.style.width = '0%';
+            loadBar.style.width = '6%';
             loadPercent.innerText = '0%';
-            loadMsg.innerText = "🔍 AI 분석 준비 중...";
+            const initialMsgText = document.getElementById('loading-msg-text');
+            if (initialMsgText) initialMsgText.innerText = "AI 분석 준비 중...";
 
             let sentenceCount = parseInt(document.getElementById('student-count').value) || 1;
 
@@ -1065,10 +1088,40 @@ ${data.cases}
                 const chunk = chunks[i];
                 const chunkNum = i + 1;
 
-                loadMsg.innerText = `🔍 [${chunkNum}/${totalChunks}] AI 분석 중... (${completedCount} / ${sentenceCount}개 완료)`;
-                const progressVal = Math.round((completedCount / sentenceCount) * 100);
-                loadBar.style.width = progressVal + '%';
-                loadPercent.innerText = progressVal + '%';
+                const startPercent = Math.round((completedCount / sentenceCount) * 100);
+                const targetPercent = Math.round(((completedCount + chunk.sentenceCount) / sentenceCount) * 100);
+                const maxSimulated = startPercent + Math.round((targetPercent - startPercent) * 0.88);
+
+                let currentDisplay = Math.max(startPercent, 6);
+                loadBar.style.width = currentDisplay + '%';
+                loadPercent.innerText = currentDisplay + '%';
+
+                const dynamicPhrases = [
+                    "학생 활동 키워드 및 관찰 기록 분석 중...",
+                    "2026 기재요령 가이드라인 및 금지어 실시간 검증 중...",
+                    "학생 맞춤형 성장 서사 문장 생성 중...",
+                    "나이스(NEIS) 글자수 및 규격 바이트 정밀 계산 중..."
+                ];
+                let phraseIdx = 0;
+                const updateMsg = () => {
+                    const phrase = dynamicPhrases[phraseIdx % dynamicPhrases.length];
+                    const msgText = document.getElementById('loading-msg-text');
+                    if (msgText) {
+                        msgText.innerText = `[${chunkNum}/${totalChunks}] ${phrase} (${completedCount} / ${sentenceCount}개 완료)`;
+                    }
+                    phraseIdx++;
+                };
+                updateMsg();
+
+                const msgInterval = setInterval(updateMsg, 1600);
+                const progressInterval = setInterval(() => {
+                    if (currentDisplay < maxSimulated) {
+                        const step = Math.max(1, Math.ceil((maxSimulated - currentDisplay) * 0.08));
+                        currentDisplay = Math.min(maxSimulated, currentDisplay + step);
+                        loadBar.style.width = currentDisplay + '%';
+                        loadPercent.innerText = currentDisplay + '%';
+                    }
+                }, 220);
 
                 const payload = {
                     area: area,
@@ -1081,6 +1134,8 @@ ${data.cases}
 
                 try {
                     const res = await callGeminiApiDirectly(payload, apiKey);
+                    clearInterval(msgInterval);
+                    clearInterval(progressInterval);
 
                     if (res.success) {
                         completedCount += chunk.sentenceCount;
@@ -1107,6 +1162,8 @@ ${data.cases}
                         throw new Error(res.error || "AI 생성 오류가 발생했습니다.");
                     }
                 } catch (err) {
+                    clearInterval(msgInterval);
+                    clearInterval(progressInterval);
                     loadContainer.classList.add('hidden-element');
                     btn.classList.remove('hidden-element');
                     showModal('생성 실패', `생성 진행 중 오류가 발생했습니다.<br>완료된 부분까지만 보관하거나 다시 시도해주세요.<br><br><div class="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-[13px] leading-relaxed break-keep font-medium text-center">${translateError(err.toString())}</div>`, 'error');
@@ -1116,7 +1173,7 @@ ${data.cases}
 
             loadBar.style.width = '100%';
             loadPercent.innerText = '100%';
-            loadMsg.innerText = "✅ 모든 학생의 생기부 생성이 완료되었습니다!";
+            loadMsg.innerHTML = '<span class="text-emerald-600 font-bold">✅ 모든 학생의 생기부 생성이 완료되었습니다!</span>';
 
             setTimeout(() => {
                 loadContainer.classList.add('hidden-element');
