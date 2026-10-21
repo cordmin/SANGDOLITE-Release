@@ -101,25 +101,73 @@
             </div>
         </div>
 
-        <!-- API 키 설정 영역 (배포용 독립 실행) -->
-        <div class="mt-auto pt-4 border-t border-slate-800 flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-300">Gemini API 키</span>
-                <span id="api-key-status" class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">미등록</span>
-            </div>
-            <div class="relative flex items-center">
-                <input type="password" id="gemini-api-key" placeholder="개인 API 키 입력" 
-                    class="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-2.5 py-1.5 pr-7 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono"
-                    oninput="saveApiKey()"
+        <!-- API 및 모델 설정 영역 (배포용 독립 실행) -->
+        <div class="mt-auto pt-3 border-t border-slate-800 flex flex-col gap-2.5">
+            <!-- 모델 선택 영역 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-300">Gemini 모델</span>
+                    <button type="button" onclick="refreshAvailableModels(true)" id="refresh-models-btn" class="text-slate-400 hover:text-blue-400 transition-colors flex items-center gap-1 text-[10px]" title="구글 실시간 지원 모델 동기화">
+                        <span>동기화</span>
+                        <i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i>
+                    </button>
+                </div>
+                <select id="gemini-model-select" onchange="handleModelChange()"
+                    class="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-mono cursor-pointer">
+                    <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (항상 최신 유지/추천)</option>
+                    <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (안정적)</option>
+                    <option value="gemini-flash-latest">gemini-flash-latest (항상 최신 플래시)</option>
+                    <option value="gemini-3.5-flash">gemini-3.5-flash (표준)</option>
+                    <option value="gemini-3.5-pro">gemini-3.5-pro (고성능)</option>
+                    <option value="custom">직접 입력...</option>
+                </select>
+                <input type="text" id="gemini-custom-model" placeholder="모델명 입력 (예: gemini-4.0)"
+                    class="hidden w-full bg-[#1e293b] border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono mt-0.5"
+                    oninput="saveCustomModel()"
                 >
-                <button type="button" onclick="clearApiKey()" class="absolute right-2 text-slate-400 hover:text-red-400 transition-colors" title="지우기">
-                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                </button>
             </div>
-            <div class="flex justify-end text-[11px]">
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 hover:underline">
-                    무료 발급받기
-                </a>
+
+            <!-- API 키 설정 영역 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-300">Gemini API 키</span>
+                    <span id="api-key-status" class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">미등록</span>
+                </div>
+                <div class="relative flex items-center">
+                    <input type="password" id="gemini-api-key" placeholder="개인 API 키 입력" 
+                        class="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-2.5 py-1.5 pr-7 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                        oninput="saveApiKey()"
+                    >
+                    <button type="button" onclick="clearApiKey()" class="absolute right-2 text-slate-400 hover:text-red-400 transition-colors" title="지우기">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                <div class="flex justify-end text-[11px]">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 hover:underline">
+                        무료 발급받기
+                    </a>
+                </div>
+            </div>
+
+            <!-- API 고급 설정 (버전/엔드포인트 변경 대비) -->
+            <div class="pt-1 border-t border-slate-800/80">
+                <button type="button" onclick="toggleAdvancedSettings()" class="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-200 transition-colors py-0.5">
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="settings-2" class="w-3 h-3"></i>
+                        <span>API 고급 설정</span>
+                    </span>
+                    <i data-lucide="chevron-down" id="adv-chevron" class="w-3 h-3 transition-transform duration-200"></i>
+                </button>
+                <div id="advanced-settings-panel" class="hidden flex-col gap-1.5 mt-1.5 p-2 bg-[#1e293b]/70 border border-slate-700/60 rounded-lg text-[11px]">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-slate-400 text-[10px]">API 엔드포인트 URL</span>
+                        <input type="text" id="api-base-url" placeholder="https://generativelanguage.googleapis.com/v1beta"
+                            class="w-full bg-[#0f172a] border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-mono"
+                            oninput="saveApiBaseUrl()"
+                        >
+                    </div>
+                    <button type="button" onclick="resetApiBaseUrl()" class="text-[10px] text-slate-400 hover:text-amber-400 text-right underline">기본값으로 복원</button>
+                </div>
             </div>
         </div>
     </aside>
@@ -295,9 +343,254 @@
         };
 
         const API_KEY_STORAGE_KEY = 'smart_record_gemini_api_key';
+        const MODEL_STORAGE_KEY = 'smart_record_gemini_model';
+        const CUSTOM_MODEL_STORAGE_KEY = 'smart_record_gemini_custom_model';
+        const API_BASE_URL_STORAGE_KEY = 'smart_record_gemini_base_url';
+        const DEFAULT_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
+        const DEFAULT_MODEL = 'gemini-flash-lite-latest';
+
+        let apiKeyDebounceTimer = null;
 
         function getStoredApiKey() {
             return (localStorage.getItem(API_KEY_STORAGE_KEY) || '').trim();
+        }
+
+        function getApiBaseUrl() {
+            const saved = (localStorage.getItem(API_BASE_URL_STORAGE_KEY) || '').trim();
+            return saved.replace(/\/+$/, '') || DEFAULT_ENDPOINT;
+        }
+
+        function saveApiBaseUrl() {
+            const input = document.getElementById('api-base-url');
+            if (!input) return;
+            const val = input.value.trim().replace(/\/+$/, '');
+            if (val && val !== DEFAULT_ENDPOINT) {
+                localStorage.setItem(API_BASE_URL_STORAGE_KEY, val);
+            } else {
+                localStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+            }
+        }
+
+        function resetApiBaseUrl() {
+            const input = document.getElementById('api-base-url');
+            if (input) input.value = '';
+            localStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+            showModal('설정 초기화', `API 엔드포인트가 공식 기본 주소로 복원되었습니다.<br><code class="text-xs text-blue-600 font-mono mt-1 block">${DEFAULT_ENDPOINT}</code>`, 'info');
+        }
+
+        function toggleAdvancedSettings() {
+            const panel = document.getElementById('advanced-settings-panel');
+            const chevron = document.getElementById('adv-chevron');
+            if (!panel) return;
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+                const input = document.getElementById('api-base-url');
+                if (input) input.value = localStorage.getItem(API_BASE_URL_STORAGE_KEY) || '';
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function getSelectedModel() {
+            const select = document.getElementById('gemini-model-select');
+            if (!select) return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
+            if (select.value === 'custom') {
+                const customInput = document.getElementById('gemini-custom-model');
+                const val = (customInput ? customInput.value : '').trim();
+                return val || DEFAULT_MODEL;
+            }
+            return select.value || DEFAULT_MODEL;
+        }
+
+        function setSelectedModel(modelName) {
+            const select = document.getElementById('gemini-model-select');
+            const customInput = document.getElementById('gemini-custom-model');
+            if (!select) return;
+
+            const exists = Array.from(select.options).some(opt => opt.value === modelName);
+            if (exists && modelName !== 'custom') {
+                select.value = modelName;
+                if (customInput) customInput.classList.add('hidden');
+                localStorage.setItem(MODEL_STORAGE_KEY, modelName);
+            } else {
+                select.value = 'custom';
+                if (customInput) {
+                    customInput.value = modelName;
+                    customInput.classList.remove('hidden');
+                }
+                localStorage.setItem(MODEL_STORAGE_KEY, 'custom');
+                localStorage.setItem(CUSTOM_MODEL_STORAGE_KEY, modelName);
+            }
+        }
+
+        function loadModel() {
+            const savedModel = localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
+            const savedCustom = localStorage.getItem(CUSTOM_MODEL_STORAGE_KEY) || '';
+            const select = document.getElementById('gemini-model-select');
+            const customInput = document.getElementById('gemini-custom-model');
+
+            if (!select) return;
+
+            if (customInput) customInput.value = savedCustom;
+
+            const exists = Array.from(select.options).some(opt => opt.value === savedModel);
+            if (exists && savedModel !== 'custom') {
+                select.value = savedModel;
+                if (customInput) customInput.classList.add('hidden');
+            } else {
+                select.value = 'custom';
+                if (customInput) {
+                    customInput.value = savedModel === 'custom' ? savedCustom : savedModel;
+                    customInput.classList.remove('hidden');
+                }
+            }
+        }
+
+        function handleModelChange() {
+            const select = document.getElementById('gemini-model-select');
+            const customInput = document.getElementById('gemini-custom-model');
+            if (!select) return;
+
+            if (select.value === 'custom') {
+                if (customInput) {
+                    customInput.classList.remove('hidden');
+                    customInput.focus();
+                }
+                localStorage.setItem(MODEL_STORAGE_KEY, 'custom');
+            } else {
+                if (customInput) customInput.classList.add('hidden');
+                localStorage.setItem(MODEL_STORAGE_KEY, select.value);
+            }
+        }
+
+        function saveCustomModel() {
+            const customInput = document.getElementById('gemini-custom-model');
+            if (!customInput) return;
+            const val = customInput.value.trim();
+            localStorage.setItem(CUSTOM_MODEL_STORAGE_KEY, val);
+        }
+
+        async function refreshAvailableModels(showNotification = false) {
+            const apiKey = getStoredApiKey();
+            if (!apiKey) {
+                if (showNotification) {
+                    showModal('API 키 미입력', '먼저 Gemini API 키를 입력한 후 동기화를 진행해 주세요.', 'info');
+                }
+                return;
+            }
+
+            const refreshBtn = document.getElementById('refresh-models-btn');
+            if (refreshBtn) refreshBtn.classList.add('animate-spin');
+
+            const baseUrl = getApiBaseUrl();
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey.startsWith('ya29.') || apiKey.startsWith('Bearer ')) {
+                headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
+            } else {
+                headers['x-goog-api-key'] = apiKey;
+            }
+
+            try {
+                updateApiKeyStatusBadge('checking');
+                const url = `${baseUrl}/models?key=${encodeURIComponent(apiKey)}`;
+                const response = await fetch(url, { headers });
+
+                if (!response.ok) {
+                    updateApiKeyStatusBadge('invalid');
+                    if (showNotification) {
+                        showModal('동기화 실패', '구글 API 서버와 통신할 수 없거나 API 키가 올바르지 않습니다.<br>API 키를 다시 확인해 주세요.', 'error');
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                const fetchedModels = (data.models || [])
+                    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+                    .map(m => m.name.replace(/^models\//, ''))
+                    .filter(name => name.startsWith('gemini') || name.startsWith('learnlm'));
+
+                if (fetchedModels.length > 0) {
+                    updateApiKeyStatusBadge('valid');
+                    populateModelSelect(fetchedModels);
+                    if (showNotification) {
+                        showModal('동기화 완료', `구글 실시간 지원 모델 <b>${fetchedModels.length}개</b>를 성공적으로 조회하여 모델 목록을 최신화했습니다!`, 'success');
+                    }
+                } else {
+                    updateApiKeyStatusBadge('valid');
+                }
+            } catch (err) {
+                console.warn('모델 동기화 통신 오류:', err);
+                updateApiKeyStatusBadge(!!apiKey);
+                if (showNotification) {
+                    showModal('네트워크 오류', '모델 목록을 가져오는 중 오류가 발생했습니다.<br>인터넷 연결 상태를 확인해 주세요.', 'error');
+                }
+            } finally {
+                if (refreshBtn) refreshBtn.classList.remove('animate-spin');
+            }
+        }
+
+        function populateModelSelect(dynamicModels) {
+            const select = document.getElementById('gemini-model-select');
+            if (!select) return;
+
+            const currentVal = getSelectedModel();
+
+            // 추천 영구 별칭 및 플래시 모델을 최상단에 배치
+            const priorityModels = [
+                'gemini-flash-lite-latest',
+                'gemini-flash-latest',
+                'gemini-3.5-flash-lite',
+                'gemini-3.5-flash',
+                'gemini-3.5-pro'
+            ];
+
+            const ordered = [];
+            // 1. 우선순위 모델 중 실제로 존재하는 모델 먼저
+            priorityModels.forEach(m => {
+                if (dynamicModels.includes(m)) ordered.push(m);
+            });
+            // 2. 나머지 모델들 추가 (최신 세대 우선 정렬)
+            dynamicModels.forEach(m => {
+                if (!ordered.includes(m) && !m.includes('tts') && !m.includes('image') && !m.includes('transcribe')) {
+                    ordered.push(m);
+                }
+            });
+
+            select.innerHTML = '';
+
+            ordered.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                let label = m;
+                if (m === 'gemini-flash-lite-latest') label = `${m} (항상 최신 라이트 자동유지/추천)`;
+                else if (m === 'gemini-flash-latest') label = `${m} (항상 최신 플래시 자동유지)`;
+                else if (m === 'gemini-3.5-flash-lite') label = `${m} (3.5 플래시 라이트/안정)`;
+                else if (m === 'gemini-3.5-flash') label = `${m} (3.5 플래시)`;
+                else if (m === 'gemini-3.5-pro') label = `${m} (3.5 프로)`;
+                opt.innerText = label;
+                select.appendChild(opt);
+            });
+
+            // 직접 입력 옵션 추가
+            const customOpt = document.createElement('option');
+            customOpt.value = 'custom';
+            customOpt.innerText = '직접 입력...';
+            select.appendChild(customOpt);
+
+            // 기존 선택 복원
+            const exists = Array.from(select.options).some(o => o.value === currentVal);
+            if (exists) {
+                select.value = currentVal;
+            } else if (ordered.includes(DEFAULT_MODEL)) {
+                select.value = DEFAULT_MODEL;
+            } else if (ordered.length > 0) {
+                select.value = ordered[0];
+            }
         }
 
         function loadApiKey() {
@@ -306,7 +599,11 @@
             if (input) {
                 input.value = savedKey;
             }
-            updateApiKeyStatusBadge(!!savedKey);
+            updateApiKeyStatusBadge(savedKey ? 'valid' : false);
+            if (savedKey) {
+                // 비동기로 조용히 모델 목록 동기화
+                setTimeout(() => refreshAvailableModels(false), 200);
+            }
         }
 
         function saveApiKey() {
@@ -315,7 +612,11 @@
             const val = input.value.trim();
             if (val) {
                 localStorage.setItem(API_KEY_STORAGE_KEY, val);
-                updateApiKeyStatusBadge(true);
+                updateApiKeyStatusBadge('checking');
+                if (apiKeyDebounceTimer) clearTimeout(apiKeyDebounceTimer);
+                apiKeyDebounceTimer = setTimeout(() => {
+                    refreshAvailableModels(false);
+                }, 600);
             } else {
                 localStorage.removeItem(API_KEY_STORAGE_KEY);
                 updateApiKeyStatusBadge(false);
@@ -332,10 +633,20 @@
             updateApiKeyStatusBadge(false);
         }
 
-        function updateApiKeyStatusBadge(hasKey) {
+        function updateApiKeyStatusBadge(status) {
             const badge = document.getElementById('api-key-status');
             if (!badge) return;
-            if (hasKey) {
+
+            if (status === 'valid') {
+                badge.innerText = '연결 정상';
+                badge.className = 'text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            } else if (status === 'invalid') {
+                badge.innerText = '키 오류';
+                badge.className = 'text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40';
+            } else if (status === 'checking') {
+                badge.innerText = '확인 중...';
+                badge.className = 'text-[10px] px-1.5 py-0.5 rounded font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40';
+            } else if (status === true) {
                 badge.innerText = '저장됨';
                 badge.className = 'text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
             } else {
@@ -345,6 +656,7 @@
         }
 
         window.onload = function() { 
+            loadModel();
             loadApiKey();
             lucide.createIcons();
             renderAutonomyPresets();
@@ -456,6 +768,7 @@
             const err = errStr.toLowerCase();
             if(err.includes("quota") || err.includes("429") || err.includes("resource_exhausted")) return "일일 AI 사용량을 초과했거나 요청이 너무 많습니다.<br>잠시 후 다시 시도해주세요.";
             if(err.includes("api key") || err.includes("key not valid") || err.includes("invalid_argument") || err.includes("api_key_invalid") || err.includes("unauthenticated")) return "입력하신 Gemini API 키가 올바르지 않거나 만료되었습니다.<br>좌측 사이드바 하단에서 API 키를 다시 확인해주세요.";
+            if(err.includes("not found") || err.includes("is not supported") || err.includes("no longer available") || err.includes("not_found")) return `선택하신 AI 모델(<b>${getSelectedModel()}</b>)을 사용할 수 없거나 지원이 종료되었습니다.<br>좌측 사이드바에서 [Gemini 모델]을 최신 지원 모델(예: gemini-3.5-flash-lite)로 변경해주세요.`;
             if(err.includes("network") || err.includes("failed to fetch") || err.includes("networkerror")) return "Google Gemini 서버와 통신할 수 없습니다.<br>인터넷 연결 상태 및 학교 네트워크의 Google API 차단 여부를 확인해주세요.";
             if(err.includes("safety") || err.includes("blocked")) return "입력하신 내용 중에 AI 안전 필터(욕설, 민감 정보 등)에 걸리는 단어가 포함된 것 같습니다.<br>내용을 순화하여 다시 작성해주세요.";
             return `오류가 발생했습니다.<br><span class="text-xs text-slate-400 mt-2 block">(${errStr})</span>`;
@@ -665,10 +978,21 @@ ${data.cases}
             }
         }
 
-        async function callGeminiApiDirectly(payload, apiKey) {
+        async function callGeminiApiDirectly(payload, apiKey, retryCount = 0) {
             const systemPrompt = buildSystemPrompt(payload);
-            const modelName = "gemini-2.5-flash-lite";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+            let modelName = getSelectedModel();
+            const baseUrl = getApiBaseUrl();
+            const trimmedKey = apiKey.trim();
+
+            const apiUrl = `${baseUrl}/models/${modelName}:generateContent?key=${encodeURIComponent(trimmedKey)}`;
+
+            const headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": trimmedKey
+            };
+            if (trimmedKey.startsWith('ya29.') || trimmedKey.startsWith('Bearer ')) {
+                headers["Authorization"] = trimmedKey.startsWith('Bearer ') ? trimmedKey : `Bearer ${trimmedKey}`;
+            }
 
             const reqBody = {
                 contents: [{
@@ -687,17 +1011,34 @@ ${data.cases}
                 ]
             };
 
-            const response = await fetch(apiUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(reqBody)
-            });
+            let response;
+            try {
+                response = await fetch(apiUrl, {
+                    method: "POST",
+                    headers: headers,
+                    body: JSON.stringify(reqBody)
+                });
+            } catch (netErr) {
+                throw new Error(`Google API 통신 실패: ${netErr.message}`);
+            }
 
             const json = await response.json();
             if (!response.ok) {
                 const errorMsg = json.error?.message || `HTTP ${response.status}`;
+
+                // 지능형 자동 복구 (Smart Failover): 모델이 구글에서 삭제/지원종료(404, deprecated)된 경우 최신 안정 모델로 1회 자동 전환
+                const isModelUnavailable = errorMsg.includes("no longer available") ||
+                                           errorMsg.includes("not found") ||
+                                           errorMsg.includes("not supported") ||
+                                           response.status === 404;
+
+                if (isModelUnavailable && retryCount === 0) {
+                    const fallbackModel = (modelName !== "gemini-flash-lite-latest") ? "gemini-flash-lite-latest" : "gemini-3.5-flash-lite";
+                    console.warn(`모델(${modelName}) 지원 불가 확인. 최신 모델(${fallbackModel})로 자동 전환하여 재시도합니다.`);
+                    setSelectedModel(fallbackModel);
+                    return await callGeminiApiDirectly(payload, apiKey, retryCount + 1);
+                }
+
                 throw new Error(errorMsg);
             }
 
