@@ -108,34 +108,10 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 #result-tbody tr:last-child td:last-child { border-bottom-right-radius: 11px; }
 .result-cell { background-color: #ffffff; }
 
-/* 생활기록부 작성요령 페이지 */
-.guide-switch { display: inline-flex; background: #f1f5f9; border-radius: 12px; padding: 3px; gap: 2px; }
-.guide-switch button { padding: 7px 14px; border-radius: 9px; font-size: 13px; font-weight: 700; color: #64748b; transition: background-color .2s, color .2s; }
-.guide-switch button.on { background: #334155; color: #fff; }
-.guide-card { flex-shrink: 0; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; overflow: hidden; }
-.guide-card.intro { background: #f8fafc; }
-.guide-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
-.guide-num { width: 22px; height: 22px; border-radius: 50%; background: #334155; color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.guide-title { font-size: 14px; font-weight: 700; color: #1e293b; }
-.guide-tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: #f1f5f9; color: #475569; }
-.guide-body { padding: 12px 14px; font-size: 14px; line-height: 1.75; color: #334155; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
-.guide-edit { display: block; width: 100%; padding: 12px 14px; font-size: 14px; line-height: 1.75; color: #1e293b; border: 0; resize: vertical; min-height: 120px; background: #fffbeb; }
-.guide-edit:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 2px #334155; }
-.guide-var { display: inline-block; padding: 0 6px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-weight: 700; font-size: 13px; }
-.guide-btn { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; font-weight: 700; border: 1px solid #cbd5e1; background: #fff; color: #334155; }
-.guide-btn.dark { background: #334155; border-color: #334155; color: #fff; }
-.guide-btn:hover { filter: brightness(0.96); }
-
-
 /* 결과 표가 칸 높이를 끝까지 채우도록 (휴대폰처럼 높이가 % 로 안 잡힐 때 대비) */
 #result-scroll { display: flex; flex-direction: column; }
 #result-scroll > #result-table { flex: 1 0 auto; }
-.guide-notice { flex-shrink: 0; padding: 10px 14px; border-radius: 10px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600; line-height: 1.6; }
 
-/* 관리자 'API 설정' (앱의 탭 + 남색 테두리 상자 모양) */
-.set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
-.set-box { border: 1px solid #334155; border-radius: 0 12px 12px 12px; background: #fff; padding: 14px; }
-.set-count { display: inline-block; min-width: 20px; margin-left: 4px; padding: 0 6px; border-radius: 99px; background: #fff; color: #334155; font-size: 12px; text-align: center; }
 .set-input { width: 100%; height: 38px; padding: 0 12px; border: 1px solid #94a3b8; border-radius: 8px; font-size: 14px; font-weight: 600; color: #1e293b; background: #fff; }
 .set-input::placeholder { color: #64748b; font-weight: 400; }
 .set-input:focus { outline: none; border-color: #334155; }
@@ -157,3 +133,12 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .settings-btn svg { width: 17px; height: 17px; }
 .set-hint a { color: #1d4ed8; text-decoration: underline; font-weight: 700; }
 .mobile-bar button.ml-auto { margin-left: auto; margin-right: -6px; }
+
+/* 설정 창: 사이드바 아래 버튼 위로 뜨는 작은 창 */
+.settings-pop { position: absolute; left: 12px; bottom: 128px; z-index: 60; width: 300px; padding: 14px; border-radius: 14px; background: #fff; color: #1e293b; box-shadow: 0 12px 32px rgba(0, 0, 0, .35); display: flex; flex-direction: column; }
+.settings-pop.hidden-element { display: none !important; }
+.pop-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: 800; color: #1e293b; }
+.pop-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; color: #334155; }
+.pop-save { margin-top: 14px; height: 38px; border-radius: 9px; background: #334155; color: #fff; font-size: 14px; font-weight: 700; }
+.pop-save:hover { background: #253141; }
+@media (max-width: 1099px) { .settings-pop { left: 12px; right: 12px; width: auto; bottom: 116px; } }

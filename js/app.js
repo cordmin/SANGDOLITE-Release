@@ -150,7 +150,6 @@ function translateError(errStr) {
 }
 
 function selArea(v, el) { 
-    setWorkVisible(true);
     toggleDrawer(false);
     if (area) {
         tabStates[area] = {
@@ -283,7 +282,7 @@ async function runAI() {
 
     if (!lsGet(LS_KEY)) {
         showModal('', 'API 키가 필요해요.<br>설정에서 내 Gemini API 키를 넣어 주세요.', 'info');
-        openGuide('settings');
+        openSettings();
         return;
     }
 
@@ -493,30 +492,20 @@ function exportExcel(tableId, fileName) {
 
 // ─────────────────────────────────────────────────────────────
 // 배포용: 서버 없이 각자 브라우저에서 바로 사용
-// - 내 API 키·모델·지침은 이 브라우저(localStorage)에만 저장됨
+// - 내 API 키·모델은 이 브라우저(localStorage)에만 저장됨
 // - 문장 생성 요청은 브라우저에서 Google Gemini API로 바로 보냄
 // ─────────────────────────────────────────────────────────────
 const LS_KEY = 'sangdolite_api_key';
 const LS_MODEL = 'sangdolite_model';
-const LS_GUIDE = 'sangdolite_guide';
 const DEFAULT_MODEL = 'gemini-flash-lite-latest'; // 구글이 늘 최신 Flash-Lite로 연결해 주는 이름
 
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 
-// 저장된 내 지침, 없거나 망가졌으면 처음 지침
-function getGuide() {
-    try {
-        const g = JSON.parse(lsGet(LS_GUIDE));
-        if (g && g.parts && g.order && g.order.behavior && g.order.general) return g;
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(GUIDE_DEFAULT));
-}
-
 // 지침에 학생 자료를 채워 AI에게 보낼 글을 만든다
 function buildPrompt(data) {
-    const guide = getGuide();
+    const guide = GUIDE_DEFAULT; // 지침은 js/guide-default.js 그대로 사용
     const P = guide.parts;
     const order = guide.order[data.area === '행동특성' ? 'behavior' : 'general'];
     const [introKey, ...ruleKeys] = order;
@@ -585,131 +574,33 @@ async function callGemini(data) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 설정 페이지 (톱니): 내 API 키·모델, 지침 보기·수정. 비밀번호 없음
+// 설정 창: 사이드바 아래 버튼을 누르면 위로 뜨는 작은 창 (내 API 키·모델만)
 // ─────────────────────────────────────────────────────────────
-let guideData = null;      // { parts: {key: {title, body}}, order: {behavior: [...], general: [...]} }
-let guideKind = 'settings';
-let guideEditing = false;
-let guideDrafts = {};      // 수정 중인 글 {key: text}
-const GUIDE_VAR_LABELS = { '생성 문단 개수': '생성 문장 개수', '최소 글자 수': '최소 글자 수 = 생성 글자 수의 85%' }; // 파란 칸 이름을 화면 이름에 맞춰 보여 줌 (지침 속 이름은 그대로)
 const MODEL_SUGGESTIONS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.5-pro'];
 const MODEL_CUSTOM = '__custom'; // 목록에 없는 모델을 직접 적을 때
-let settingsModel = '';    // 화면에서 고르는 중인 모델 ('' = 기본)
+let settingsModel = '';    // 고르는 중인 모델 ('' = 기본)
 let settingsCustom = '';
-
-function setWorkVisible(show) {
-    document.getElementById('work-main').classList.toggle('hidden-element', !show);
-    document.getElementById('work-result').classList.toggle('hidden-element', !show);
-    document.getElementById('guide-page').classList.toggle('hidden-element', show);
-}
-
-function openGuide(kind) {
-    document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('active-main'));
-    setWorkVisible(false);
-    toggleDrawer(false);
-    guideData = getGuide();
-    guideEditing = false; guideDrafts = {};
-    if (kind) guideKind = kind;
-    if (guideKind === 'settings') loadSettingsDraft();
-    renderGuide();
-}
-
-function showGuideKind(kind) {
-    if (guideEditing && Object.keys(changedGuideParts()).length && !confirm('고친 지침을 저장하지 않고 나갈까요?')) return;
-    guideEditing = false; guideDrafts = {};
-    guideKind = kind;
-    if (kind === 'settings') loadSettingsDraft();
-    renderGuide();
-}
 
 function escapeHtml(text) {
     return text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function renderGuide() {
-    document.querySelectorAll('.guide-switch button').forEach(b => b.classList.toggle('on', b.dataset.guide === guideKind));
-    renderGuideActions();
-    if (guideKind === 'settings') return renderSettings();
-
-    const order = guideData.order[guideKind];
-    const other = guideData.order[guideKind === 'behavior' ? 'general' : 'behavior'];
-    const list = document.getElementById('guide-list');
-    list.innerHTML = '';
-    order.forEach((key, idx) => {
-        const part = guideData.parts[key];
-        const text = guideDrafts[key] ?? part.body;
-        const tags = other.includes(key) ? '<span class="guide-tag">공통</span>' : '';
-        const card = document.createElement('div');
-        card.className = 'guide-card' + (idx === 0 ? ' intro' : '');
-        card.innerHTML = `<div class="guide-head">${idx === 0 ? '' : `<span class="guide-num">${idx}</span>`}<span class="guide-title">${escapeHtml(part.title)}</span>${tags}</div>`;
-        if (guideEditing) {
-            const ta = document.createElement('textarea');
-            ta.className = 'guide-edit';
-            ta.value = text;
-            ta.rows = text.split('\n').length + 1;
-            ta.oninput = () => { guideDrafts[key] = ta.value; };
-            card.appendChild(ta);
-        } else {
-            const body = document.createElement('div');
-            body.className = 'guide-body';
-            body.innerHTML = escapeHtml(text).replace(/\{([^{}\n]{1,10})\}/g, (_, name) => `<span class="guide-var">${GUIDE_VAR_LABELS[name] || name}</span>`);
-            card.appendChild(body);
-        }
-        list.appendChild(card);
-    });
-}
-
-function renderGuideActions() {
-    const box = document.getElementById('guide-actions');
-    if (guideKind === 'settings') {
-        box.innerHTML = '<button type="button" class="guide-btn dark" onclick="saveSettings()">설정 저장</button>';
-    } else if (guideEditing) {
-        box.innerHTML = '<button type="button" class="guide-btn" onclick="resetGuide()">처음 지침으로</button>'
-            + '<button type="button" class="guide-btn" onclick="cancelGuideEdit()">취소</button>'
-            + '<button type="button" class="guide-btn dark" onclick="saveGuide()">저장</button>';
-    } else {
-        box.innerHTML = '<button type="button" class="guide-btn" onclick="guideEditing=true; guideDrafts={}; renderGuide()">수정</button>';
-    }
-}
-
-function changedGuideParts() {
-    const changed = {};
-    for (const [key, text] of Object.entries(guideDrafts)) {
-        if (text.trim() !== guideData.parts[key].body) changed[key] = text.trim();
-    }
-    return changed;
-}
-
-function cancelGuideEdit() {
-    if (Object.keys(changedGuideParts()).length && !confirm('고친 내용을 저장하지 않고 나갈까요?')) return;
-    guideEditing = false; guideDrafts = {};
-    renderGuide();
-}
-
-function saveGuide() {
-    const changed = changedGuideParts();
-    if (!Object.keys(changed).length) return showModal('', '바뀐 내용이 없어요.', 'info');
-    if (Object.values(changed).some(t => !t)) return showModal('', '빈 칸으로는 저장할 수 없어요.', 'info');
-    for (const [key, text] of Object.entries(changed)) guideData.parts[key].body = text;
-    if (!lsSet(LS_GUIDE, JSON.stringify(guideData))) return showModal('저장 실패', '이 브라우저에 저장하지 못했어요.', 'error');
-    guideEditing = false; guideDrafts = {};
-    renderGuide();
-    showModal('', '저장했어요.<br>이 브라우저의 문장 생성에 바로 적용돼요.', 'info');
-}
-
-function resetGuide() {
-    if (!confirm('지침 전체를 처음 지침으로 되돌릴까요?\n고친 내용은 모두 사라져요.')) return;
-    lsDel(LS_GUIDE);
-    guideData = getGuide(); guideEditing = false; guideDrafts = {};
-    renderGuide();
-}
-
-// ── 내 API 키·모델
-function loadSettingsDraft() {
+function openSettings() {
+    toggleDrawer(true); // 휴대폰에선 서랍을 열어 창이 보이게 (넓은 화면에선 영향 없음)
     const m = lsGet(LS_MODEL) || '';
     const known = !m || MODEL_SUGGESTIONS.includes(m);
     settingsModel = known ? m : MODEL_CUSTOM;
     settingsCustom = known ? '' : m;
+    document.getElementById('settings-pop').classList.remove('hidden-element');
+    renderSettings();
+}
+
+function closeSettings() {
+    document.getElementById('settings-pop').classList.add('hidden-element');
+}
+
+function toggleSettings() {
+    document.getElementById('settings-pop').classList.contains('hidden-element') ? openSettings() : closeSettings();
 }
 
 function keepModelDraft() {
@@ -722,27 +613,20 @@ function keepModelDraft() {
 function renderSettings() {
     const key = lsGet(LS_KEY);
     const isCustom = settingsModel === MODEL_CUSTOM;
-    document.getElementById('guide-list').innerHTML = `<div class="set-grid">
-        <div>
-            <div class="step-label">내 API 키</div>
-            <div class="set-box">
-                ${key ? `<div class="set-key"><span>${escapeHtml(key.slice(0, 4) + '…' + key.slice(-4))}</span><button type="button" class="set-del" aria-label="지우기" title="지우기" onclick="removeApiKey()"><i data-lucide="trash-2"></i></button></div>` : ''}
-                <input id="set-newkey" class="set-input" type="password" autocomplete="off" placeholder="${key ? '새 키로 바꾸려면 붙여 넣기' : 'Gemini API 키 붙여 넣기'}">
-                <p class="set-hint">이 브라우저에만 저장돼요 · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">키 발급받기</a></p>
-            </div>
-        </div>
-        <div>
-            <div class="step-label">AI 모델</div>
-            <div class="set-box">
-                <select id="set-model" class="nice-select set-input" onchange="keepModelDraft(); renderSettings()">
-                    <option value="">기본 모델 (${DEFAULT_MODEL})</option>
-                    ${MODEL_SUGGESTIONS.filter(m => m !== DEFAULT_MODEL).map(m => `<option value="${m}"${m === settingsModel ? ' selected' : ''}>${m}</option>`).join('')}
-                    <option value="${MODEL_CUSTOM}"${isCustom ? ' selected' : ''}>직접 입력</option>
-                </select>
-                ${isCustom ? `<input id="set-model-custom" class="set-input mt-2" placeholder="모델 이름 (예: gemini-3.5-flash)" value="${escapeHtml(settingsCustom)}">` : ''}
-            </div>
-        </div>
-    </div>`;
+    document.getElementById('settings-pop').innerHTML = `
+        <div class="pop-head"><span>API 설정</span><button type="button" class="set-del" aria-label="닫기" onclick="closeSettings()"><i data-lucide="x"></i></button></div>
+        <label class="pop-label">내 API 키</label>
+        ${key ? `<div class="set-key"><span>${escapeHtml(key.slice(0, 4) + '…' + key.slice(-4))}</span><button type="button" class="set-del" aria-label="지우기" title="지우기" onclick="removeApiKey()"><i data-lucide="trash-2"></i></button></div>` : ''}
+        <input id="set-newkey" class="set-input" type="password" autocomplete="off" placeholder="${key ? '새 키로 바꾸려면 붙여 넣기' : 'Gemini API 키 붙여 넣기'}" onkeydown="if(event.key==='Enter') saveSettings()">
+        <p class="set-hint">이 브라우저에만 저장돼요 · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">키 발급받기</a></p>
+        <label class="pop-label mt-3">AI 모델</label>
+        <select id="set-model" class="nice-select set-input" onchange="keepModelDraft(); renderSettings()">
+            <option value="">기본 (${DEFAULT_MODEL.replace("gemini-", "")})</option>
+            ${MODEL_SUGGESTIONS.filter(m => m !== DEFAULT_MODEL).map(m => `<option value="${m}"${m === settingsModel ? ' selected' : ''}>${m}</option>`).join('')}
+            <option value="${MODEL_CUSTOM}"${isCustom ? ' selected' : ''}>직접 입력</option>
+        </select>
+        ${isCustom ? `<input id="set-model-custom" class="set-input mt-2" placeholder="모델 이름" value="${escapeHtml(settingsCustom)}">` : ''}
+        <button type="button" class="pop-save" onclick="saveSettings()">저장</button>`;
     lucide.createIcons();
 }
 
@@ -761,9 +645,18 @@ function saveSettings() {
     if (settingsModel === MODEL_CUSTOM && !/^[A-Za-z0-9._\-]{3,80}$/.test(model)) return showModal('', '모델 이름을 확인해 주세요.', 'info');
     if (newKey && !lsSet(LS_KEY, newKey)) return showModal('저장 실패', '이 브라우저에 저장하지 못했어요.<br>시크릿 창이면 일반 창에서 열어 주세요.', 'error');
     if (model) lsSet(LS_MODEL, model); else lsDel(LS_MODEL);
-    renderSettings();
-    showModal('', lsGet(LS_KEY) ? '설정을 저장했어요.<br>이제 문장을 만들 수 있어요.' : '모델을 저장했어요.<br>문장을 만들려면 API 키를 넣어 주세요.', 'info');
+    if (!lsGet(LS_KEY)) { renderSettings(); return showModal('', '문장을 만들려면 API 키를 넣어 주세요.', 'info'); }
+    closeSettings();
+    toggleDrawer(false);
+    showModal('', '저장했어요.<br>이제 문장을 만들 수 있어요.', 'info');
 }
+
+// 설정 창 바깥을 누르면 닫힘
+document.addEventListener('click', e => {
+    const pop = document.getElementById('settings-pop');
+    if (pop.classList.contains('hidden-element') || pop.contains(e.target) || e.target.closest('[data-settings-toggle]')) return;
+    closeSettings();
+});
 
 // 휴대폰·태블릿: 버거 버튼으로 사이드바 서랍 열고 닫기
 function toggleDrawer(open) {
