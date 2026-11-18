@@ -1,4 +1,3 @@
-
 const keywordDB = {
     '행동특성': { 
         pos: {
@@ -7,7 +6,7 @@ const keywordDB = {
             '인성태도': ['차분함', '인내심', '겸손함']
         },
         neg: {
-            '학교생활': ['무질서', '비성실', '잦은지각'],
+            '학교생활': ['무질서', '불성실', '잦은지각'],
             '교우관계': ['소극적', '이기적', '수동적'],
             '인성태도': ['예민함', '끈기부족', '고집센']
         }
@@ -17,7 +16,10 @@ const keywordDB = {
 const FILLER_ROW = '<tr class="filler-row" style="height: 100%;"><td class="excel-num"></td><td></td><td class="excel-byte"></td></tr>';
 
 let area = '자율';
-let charLimit = 125; 
+let charLimit = 250;
+const CHAR_OPTIONS = { '행동특성': [150, 300] }; // 영역별 생성 글자 수 선택지 (나머지 영역은 250자·500자)
+// 화면에 보이는 영역 이름 (2026 기재요령 용어)
+const AREA_NAMES = { '자율': '자율활동', '진로': '진로활동', '동아리': '동아리활동', '과세특': '과목별 세부능력 및 특기사항', '행동특성': '행동특성 및 종합의견' };
 const selectedKeywords = new Map(); // 단어 → 'pos'(좋은 태도) | 'neg'(아쉬운 태도)
 let rawGeneratedText = ""; 
 
@@ -28,12 +30,12 @@ let selectedAutonomyBadges = [];
 
 const presetsByArea = {
     '자율': [
-        '정부반장선거', '학급자치활동', '학교폭력예방교육', '장애인식개선교육', '체육한마당',
+        '정·부반장 선거', '학급자치활동', '학교폭력예방교육', '장애인식개선교육', '체육한마당',
         '흡연예방교육', '생명존중교육', '다문화이해교육'
     ],
     '진로': [
         '진로심리검사', '진로적성검사', '직업인초청강연', '직업인과의만남',
-        '진로융합체험', '현장직업체험', '진로체험의날', '나의꿈발표대회'
+        '진로융합체험', '현장직업체험', '진로체험의날', '나의 꿈 발표'
     ]
 };
 
@@ -105,7 +107,7 @@ function removeAutonomyBadge(id) {
 function renderSelectedAutonomyBadges() {
     const container = document.getElementById('selected-autonomy-badges');
     if (!container) return;
-    container.dataset.emptyMessage = `${area} 활동 내용을 위에서 선택하거나 직접 추가해주세요`;
+    container.dataset.emptyMessage = `${AREA_NAMES[area]} 내용을 위에서 선택하거나 직접 추가해 주세요`;
     container.innerHTML = '';
 
     selectedAutonomyBadges.forEach(b => {
@@ -142,14 +144,15 @@ function closeModal() { document.getElementById('custom-modal').classList.add('h
 
 function translateError(errStr) {
     const err = errStr.toLowerCase();
-    if (err.includes("api key") || err.includes("api_key") || err.includes("permission") || err.includes("unauthenticated")) return "API 키가 올바르지 않거나 쓸 수 없는 키예요.<br>설정(톱니)에서 키를 확인해 주세요.";
-    if (err.includes("quota") || err.includes("429") || err.includes("resource_exhausted")) return "오늘 쓸 수 있는 AI 사용량을 다 썼거나 요청이 너무 많아요.<br>잠시 후 다시 시도해 주세요.";
-    if (err.includes("failed to fetch") || err.includes("network")) return "인터넷 연결을 확인해 주세요.";
-    if (err.includes("safety") || err.includes("blocked") || err.includes("요청 차단")) return "입력 내용 중에 AI 안전 필터에 걸리는 표현이 있는 것 같아요.<br>내용을 순화해서 다시 시도해 주세요.";
-    return `알 수 없는 오류가 발생했어요.<br><span class="text-xs text-slate-400 mt-2 block">(${escapeHtml(errStr)})</span>`;
+    if(err.includes("quota") || err.includes("429")) return "일일 AI 사용량을 초과했거나 요청이 너무 많습니다.<br>잠시 후 다시 시도해주세요.";
+    if(err.includes("network") || err.includes("통신 실패") || err.includes("fetch") || err.includes("failed to fetch")) return "Gemini API에 연결하지 못했어요. 네트워크 상태를 확인해 주세요.";
+    if(err.includes("safety") || err.includes("blocked")) return "입력하신 내용 중에 AI 안전 필터(욕설, 폭력성 등)에 걸리는 단어가 포함된 것 같습니다.<br>내용을 순화하여 다시 작성해주세요.";
+    if(err.includes("api key") || err.includes("no_api_key")) return "설정에서 내 Gemini API 키를 확인해 주세요.";
+    return `알 수 없는 오류가 발생했습니다.<br><span class="text-xs text-slate-400 mt-2 block">(${errStr})</span>`;
 }
 
 function selArea(v, el) { 
+    setWorkVisible(true);
     toggleDrawer(false);
     if (area) {
         tabStates[area] = {
@@ -162,6 +165,7 @@ function selArea(v, el) {
     }
 
     area = v; 
+    renderCharOptions();
     document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('active-main'));
     el.classList.add('active-main');
 
@@ -185,7 +189,7 @@ function selArea(v, el) {
         caseGrp.classList.remove('merged');
         keySec.classList.add('hidden-element');
 
-        document.getElementById('autonomy-label').innerText = (area === '자율') ? '자율활동 내용 선택' : '진로활동 내용 선택';
+        document.getElementById('autonomy-label').innerText = `${AREA_NAMES[area]} 내용 선택`;
         selectedAutonomyBadges = tabStates[area].autonomyBadges || [];
         renderSelectedAutonomyBadges();
         renderAutonomyPresets();
@@ -206,8 +210,8 @@ function selArea(v, el) {
         const isClub = area === '동아리';
         caseGrp.classList.add('merged');
         document.getElementById('merge-name-cell').innerText = isClub ? '동아리 이름' : '과목 이름';
-        document.getElementById('merge-body-title').innerText = isClub ? '동아리 활동 내용' : '교과 학습 및 활동 내용';
-        caseLabel.innerText = isClub ? '스포츠 & 동아리 정보 입력' : '교과 정보 입력';
+        document.getElementById('merge-body-title').innerText = isClub ? '동아리활동 내용' : '교과 학습 및 활동 내용';
+        caseLabel.innerText = isClub ? '동아리활동 정보 입력' : '교과 정보 입력';
         subjInp.placeholder = isClub ? '예시: 과학영화 감상반, 농구반, 건강 걷기반' : '예시: 국어, 영어, 수학, 과학';
         caseInp.placeholder = isClub ? '예시: 또래 상담 멘토링, 영화 감상문 발표, 점자책 만들기' : '예시: 밀도, 순물질과 혼합물, 거울과 렌즈 (키워드로만 입력해도 OK)';
     }
@@ -216,6 +220,15 @@ function selArea(v, el) {
     document.getElementById('subj-inp').value = tabStates[area].subj || '';
 
     updateKeywords();
+}
+
+// 영역에 맞는 글자 수 선택지로 바꿈. 고른 값이 새 선택지에 없으면 첫 값으로
+function renderCharOptions() {
+    const opts = CHAR_OPTIONS[area] || [250, 500];
+    if (!opts.includes(charLimit)) charLimit = opts[0];
+    const sel = document.getElementById('char-select');
+    sel.innerHTML = opts.map(n => `<option value="${n}">${n}자 (약 ${n * 3}byte)</option>`).join('');
+    sel.value = charLimit;
 }
 
 function selChar(v) {
@@ -265,10 +278,11 @@ function makeKeywordPair(p, n) {
 }
 
 async function runAI() {
+    if (!lsGet(LS_KEY)) { openSettings(); showModal('API 키 설정', '문장을 만들려면 내 Gemini API 키를 먼저 저장해 주세요.', 'info'); return; }
     let cases = "";
     if (area === '자율' || area === '진로') {
         if (selectedAutonomyBadges.length === 0) {
-            showModal('입력 확인', `${area} 활동 내용을 최소 1개 이상 선택하거나<br>직접 입력해 주세요.`, 'info');
+            showModal('입력 확인', `${AREA_NAMES[area]} 내용을 최소 1개 이상 선택하거나<br>직접 입력해 주세요.`, 'info');
             return;
         }
         cases = selectedAutonomyBadges.map(b => b.text.trim()).filter(t => t.length > 0).join(', ');
@@ -278,12 +292,6 @@ async function runAI() {
             showModal('입력 확인', '활동 내용이나 관찰 기록을<br>먼저 입력해 주세요.', 'info');
             return;
         }
-    }
-
-    if (!lsGet(LS_KEY)) {
-        showModal('', 'API 키가 필요해요.<br>설정에서 내 Gemini API 키를 넣어 주세요.', 'info');
-        openSettings();
-        return;
     }
 
     const btn = document.getElementById('run-btn');
@@ -340,7 +348,8 @@ async function runAI() {
             subject: document.getElementById('subj-inp').value,
             cases: chunk.cases,
             posKeywords: pickKeywords('pos'),
-            negKeywords: pickKeywords('neg')
+            negKeywords: pickKeywords('neg'),
+            keywords: Array.from(selectedKeywords.keys()).join(', ') // 예전 서버 호환용
         };
 
         try {
@@ -348,34 +357,33 @@ async function runAI() {
 
             clearInterval(progressInterval);
 
-            if (res.success) {
-                completedCount += chunk.sentenceCount;
+            if (res.success || res.partial) {
+                const cleanItems = String(res.result || '').split('\n')
+                    .map(line => line.trim().replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim())
+                    .filter(Boolean).slice(0, chunk.sentenceCount);
+                cleanItems.forEach(item => {
+                    allResults.push(item);
+                    accumulatedText += `${++completedCount}. ${item}\n`;
+                });
                 const currentProgress = Math.round((completedCount / sentenceCount) * 100);
                 loadBar.style.width = currentProgress + '%';
                 loadPercent.innerText = currentProgress + '%';
 
-                const rawLines = res.result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                const cleanItems = rawLines.map(line => line.replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim()).filter(l => l.length > 0);
-
-                if (cleanItems.length === 0) {
-                    const cleanRes = res.result.replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim();
-                    allResults.push(cleanRes);
-                    accumulatedText += `${completedCount - chunk.sentenceCount + 1}. ${cleanRes}\n`;
-                } else {
-                    cleanItems.forEach((item, idx) => {
-                        const cleanText = item.replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim();
-                        allResults.push(cleanText);
-                        const seqNum = completedCount - chunk.sentenceCount + idx + 1;
-                        accumulatedText += `${seqNum}. ${cleanText}\n`;
-                    });
-                }
+                if (!res.success || cleanItems.length !== chunk.sentenceCount) throw new Error(res.error || `요청한 ${chunk.sentenceCount}개 중 ${cleanItems.length}개만 생성됐어요. 생성 개수를 줄여 다시 시도해 주세요.`);
             } else {
                 throw new Error(res.error || "AI 생성 오류가 발생했습니다.");
             }
         } catch (err) {
             clearInterval(progressInterval);
             btn.disabled = false;
-            showModal('생성 실패', `생성 진행 중 오류가 발생했습니다.<br>완료된 부분까지만 보관하거나 다시 시도해주세요.<br><br>오류내용: ${translateError(err.toString())}`, 'error');
+            const actualProgress = Math.round((completedCount / sentenceCount) * 100) + '%';
+            loadBar.style.width = actualProgress;
+            loadPercent.innerText = actualProgress;
+            if (allResults.length) {
+                rawGeneratedText = accumulatedText.trim();
+                renderTable(allResults);
+            }
+            showModal('생성 실패', `요청한 ${sentenceCount}개 중 ${completedCount}개를 생성했습니다.${allResults.length ? '<br>완성된 문단은 결과 표에 보관했어요.' : ''}<br><br>${translateError(escapeHtml(err.toString()))}`, 'error');
             return;
         }
     }
@@ -383,11 +391,18 @@ async function runAI() {
     loadBar.style.width = '100%';
     loadPercent.innerText = '100%';
 
+    let spellings = {};
+    try {
+        spellings = await rcCheckSpelling(allResults.map(text => ({ text })));
+    } catch (error) {
+        showModal('맞춤법 점검 안내', '문장은 생성했지만 사전 점검을 완료하지 못했어요. 등록된 보완 규칙만 적용합니다.<br>' + escapeHtml(error.message), 'info');
+    }
+
     setTimeout(() => {
         btn.disabled = false;
 
         rawGeneratedText = accumulatedText.trim();
-        renderTable(allResults);
+        renderTable(allResults, spellings);
     }, 500);
 }
 
@@ -400,9 +415,9 @@ function getByteLength(text) {
             if (i + 1 < text.length && text[i + 1] === '\n') {
                 i++;
             }
-            bytes += 2;
+            bytes += 1; // 나이스: 엔터(Enter)는 1Byte (2026 기재요령)
         } else if (text[i] === '\n') {
-            bytes += 2;
+            bytes += 1;
         } else if (code <= 0x007f) {
             bytes += 1;
         } else {
@@ -418,13 +433,23 @@ function getByteLength(text) {
     return bytes;
 }
 
-function renderTable(items) {
+// 생성된 문장을 보조 점검 규칙(record-check.js)으로 살펴, 기재할 수 없는 표현·표기·끝맺음 문제를 칠하고 아래에 알려 줌
+function genCheckHtml(text, spellings = {}) {
+    if (typeof rcCheckOne !== 'function') return escapeHtml(text).replace(/\n/g, '<br>');
+    const issues = rcCheckOne({ area: AREA_NAMES[area], text }, { ...RC_DEFAULT_SETTINGS, limits: {}, spellings }, getByteLength)
+        .filter(i => i.type === 'forbid' || i.type === 'spell' || i.type === 'ending');
+    if (!issues.length) return rcHighlight(text, []);
+    const whys = [...new Set(issues.map(i => i.why))].map(w => `<li>${escapeHtml(w)}</li>`).join('');
+    return rcHighlight(text, issues) + `<ul class="gen-warn">${whys}</ul>`;
+}
+
+function renderTable(items, spellings = {}) {
     const tbody = document.getElementById('result-tbody');
     tbody.innerHTML = '';
     items.forEach((item, index) => {
         const cleanText = item.trim().replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim();
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="excel-num">${index + 1}</td><td class="result-cell">${cleanText.replace(/\n/g, '<br>')}</td><td class="excel-byte">${getByteLength(cleanText)} Byte</td>`;
+        tr.innerHTML = `<td class="excel-num">${index + 1}</td><td class="result-cell">${genCheckHtml(cleanText, spellings)}</td><td class="excel-byte">${getByteLength(cleanText)} Byte</td>`;
         tbody.appendChild(tr);
     });
     tbody.insertAdjacentHTML('beforeend', FILLER_ROW); // 표 아래 빈 공간 채우기
@@ -441,7 +466,7 @@ function exportExcel(tableId, fileName) {
         const table = document.createElement('table');
         table.innerHTML = '<thead><tr><th>순</th><th>특기사항</th><th>글자 수</th></tr></thead>';
         const clonedBody = bodyTable.tBodies[0].cloneNode(true);
-        clonedBody.querySelectorAll('.filler-row').forEach(r => r.remove());
+        clonedBody.querySelectorAll('.filler-row, .gen-warn').forEach(r => r.remove());
         table.appendChild(clonedBody);
 
         const wb = XLSX.utils.book_new();
@@ -490,11 +515,6 @@ function exportExcel(tableId, fileName) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 배포용: 서버 없이 각자 브라우저에서 바로 사용
-// - 내 API 키·모델은 이 브라우저(localStorage)에만 저장됨
-// - 문장 생성 요청은 브라우저에서 Google Gemini API로 바로 보냄
-// ─────────────────────────────────────────────────────────────
 const LS_KEY = 'sangdolite_api_key';
 const LS_MODEL = 'sangdolite_model';
 const DEFAULT_MODEL = 'gemini-flash-lite-latest'; // 구글이 늘 최신 Flash-Lite로 연결해 주는 이름
@@ -520,7 +540,7 @@ ${rules}`;
         '생성 문단 개수': data.sentenceCount,
         '생성 글자 수': data.charLimit,
         '최소 글자 수': Math.round(data.charLimit * 0.85), // 생성 글자 수의 85%
-        '영역': data.area,
+        '영역': data.area === '자율' ? RC_JAYUL : (AREA_NAMES[data.area] || data.area),
         '과목': data.subject || '해당 없음',
         '좋은태도': data.posKeywords || '없음',
         '아쉬운태도': data.negKeywords || '없음',
@@ -566,6 +586,7 @@ async function callGemini(data) {
         // 길이 제한으로 중간에 멈췄으면 마지막(끊긴) 문장은 빼고 돌려줌
         if (cand.finishReason === 'MAX_TOKENS') {
             const lines = text.split('\n'); lines.pop(); text = lines.join('\n').trim();
+            return { success: false, partial: true, result: text, error: '출력 한도에 도달해 요청한 개수를 모두 생성하지 못했어요. 생성 글자 수나 개수를 줄여 다시 시도해 주세요.' };
         }
         if (text) return { success: true, result: text };
     }
@@ -662,4 +683,9 @@ document.addEventListener('click', e => {
 function toggleDrawer(open) {
     document.getElementById('sidebar').classList.toggle('open', open);
     document.getElementById('drawer-backdrop').classList.toggle('open', open);
+}
+
+function setWorkVisible(show) {
+    ['work-main', 'work-result'].forEach(id => document.getElementById(id).classList.toggle('hidden-element', !show));
+    document.querySelectorAll('.check-part').forEach(el => el.classList.add('hidden-element'));
 }
