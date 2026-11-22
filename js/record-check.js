@@ -676,8 +676,11 @@ function rcCheckOne(rec, settings, byteLen) {
     if (!(settings.off || []).includes('spell')) for (const word of rcSpellWords(text)) {
         const suggestions = settings.spellings?.[word];
         if (!suggestions || issues.some(issue => (issue.type === 'spell' || issue.type === 'forbid') && (word.includes(issue.what) || issue.what.includes(word)))) continue; // 이미 잡힌 말은 한 번만
-        const hint = suggestions.length ? ` 교정 후보: ${suggestions.map(s => `'${s}'`).join(', ')}.` : '';
-        add('spell', 'check', word, `'${word}'은(는) 한국어 사전에서 확인되지 않아요.${hint} 전문어·이름이면 원문을 확인해 주세요.`);
+        // 사전 미등록·교정 후보만으로는 오류 근거가 되지 않음. 알려진 오타와 교정 가능한 활용형만 표시.
+        const known = RC_RETIRED_SPELL.find(rule => word.includes(rule.wrong));
+        const fix = known ? word.replace(known.wrong, known.right) : word.replace(/햇(?=다|음|으|던|는)/g, '했');
+        if (fix === word || (!known && !suggestions.includes(fix))) continue;
+        add('spell', 'check', word, `'${word}' → '${fix}'`, fix);
     }
 
     // 문장 끝맺음: 특기사항은 '~함.', '~임.'처럼 명사형으로 끝내고 마침표를 찍음

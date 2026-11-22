@@ -142,6 +142,22 @@ function showModal(title, msg, type = 'info') {
 }
 function closeModal() { document.getElementById('custom-modal').classList.add('hidden-element'); }
 
+function showConfirm(title, message, confirmText = '나가기', preview = '') {
+    const dialog = document.getElementById('confirm-dialog');
+    if (dialog.open) return Promise.resolve(false);
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-desc').textContent = message;
+    document.getElementById('confirm-submit').textContent = confirmText;
+    const detail = document.getElementById('confirm-preview');
+    detail.innerHTML = preview;
+    detail.hidden = !preview;
+    dialog.returnValue = '';
+    return new Promise(resolve => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+        dialog.showModal();
+    });
+}
+
 function translateError(errStr) {
     const err = errStr.toLowerCase();
     if(err.includes("quota") || err.includes("429")) return "일일 AI 사용량을 초과했거나 요청이 너무 많습니다.<br>잠시 후 다시 시도해주세요.";
@@ -178,7 +194,8 @@ function selArea(v, el) {
     const subjInp = document.getElementById('subj-inp');
 
     rawGeneratedText = tabStates[area].resultText || "";
-    document.getElementById('result-tbody').innerHTML = tabStates[area].resultHtml || FILLER_ROW;
+    if (rawGeneratedText) renderTable(rawGeneratedText.split('\n'));
+    else document.getElementById('result-tbody').innerHTML = FILLER_ROW;
 
     document.getElementById('student-count').value = 1;
     document.getElementById('student-count').dataset.validCount = '1';
@@ -391,18 +408,11 @@ async function runAI() {
     loadBar.style.width = '100%';
     loadPercent.innerText = '100%';
 
-    let spellings = {};
-    try {
-        spellings = await rcCheckSpelling(allResults.map(text => ({ text })));
-    } catch (error) {
-        showModal('맞춤법 점검 안내', '문장은 생성했지만 사전 점검을 완료하지 못했어요. 등록된 보완 규칙만 적용합니다.<br>' + escapeHtml(error.message), 'info');
-    }
-
     setTimeout(() => {
         btn.disabled = false;
 
         rawGeneratedText = accumulatedText.trim();
-        renderTable(allResults, spellings);
+        renderTable(allResults);
     }, 500);
 }
 
@@ -434,25 +444,57 @@ function getByteLength(text) {
 }
 
 // 생성된 문장을 보조 점검 규칙(record-check.js)으로 살펴, 기재할 수 없는 표현·표기·끝맺음 문제를 칠하고 아래에 알려 줌
-function genCheckHtml(text, spellings = {}) {
-    if (typeof rcCheckOne !== 'function') return escapeHtml(text).replace(/\n/g, '<br>');
-    const issues = rcCheckOne({ area: AREA_NAMES[area], text }, { ...RC_DEFAULT_SETTINGS, limits: {}, spellings }, getByteLength)
-        .filter(i => i.type === 'forbid' || i.type === 'spell' || i.type === 'ending');
-    if (!issues.length) return rcHighlight(text, []);
-    const whys = [...new Set(issues.map(i => i.why))].map(w => `<li>${escapeHtml(w)}</li>`).join('');
-    return rcHighlight(text, issues) + `<ul class="gen-warn">${whys}</ul>`;
+
+
+async function copyGeneratedParagraph(text, button) {
+    if (button.disabled) return;
+    button.disabled = true;
+    // 클릭 직후 동기 복사를 먼저 시도: 창 포커스·권한·iframe 제한에 걸리는 clipboard API보다 확실함.
+    let copied = false;
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.setAttribute('readonly', '');
+    input.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(input);
+    try {
+        input.select();
+        copied = document.execCommand('copy');
+    } catch { /* 아래 clipboard API로 재시도 */ }
+    finally { input.remove(); button.focus({ preventScroll: true }); }
+    if (!copied && navigator.clipboard) {
+        try {
+            await Promise.race([
+                navigator.clipboard.writeText(text),
+                new Promise((_, reject) => setTimeout(reject, 1500)) // 권한 대기로 멈추지 않게
+            ]);
+            copied = true;
+        } catch { /* 두 방식 모두 막히면 아래에서 안내 */ }
+    }
+    button.disabled = false;
+    if (!copied) {
+        showToast('복사하지 못했어요. 문장을 선택한 뒤 Ctrl+C로 복사해 주세요.', 'error');
+        return;
+    }
+    button.innerHTML = '<i data-lucide="check" aria-hidden="true"></i><span>완료</span>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => {
+        button.innerHTML = '<i data-lucide="copy" aria-hidden="true"></i><span>복사</span>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }, 1600);
 }
 
-function renderTable(items, spellings = {}) {
+function renderTable(items) {
     const tbody = document.getElementById('result-tbody');
     tbody.innerHTML = '';
     items.forEach((item, index) => {
         const cleanText = item.trim().replace(/^(?:\d+[\.\)\-]*\s*)+/, '').trim();
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="excel-num">${index + 1}</td><td class="result-cell">${genCheckHtml(cleanText, spellings)}</td><td class="excel-byte">${getByteLength(cleanText)} Byte</td>`;
+        tr.innerHTML = `<td class="excel-num">${index + 1}</td><td class="result-cell">${escapeHtml(cleanText).replace(/\n/g, '<br>')}<button type="button" class="result-copy" aria-label="${index + 1}번 문단 복사"><i data-lucide="copy" aria-hidden="true"></i><span>복사</span></button></td><td class="excel-byte">${Array.from(cleanText).length}자<br><span class="result-byte-count">(${getByteLength(cleanText)}byte)</span></td>`;
+        tr.querySelector('.result-copy').addEventListener('click', event => copyGeneratedParagraph(cleanText, event.currentTarget));
         tbody.appendChild(tr);
     });
     tbody.insertAdjacentHTML('beforeend', FILLER_ROW); // 표 아래 빈 공간 채우기
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function exportExcel(tableId, fileName) {
@@ -466,7 +508,9 @@ function exportExcel(tableId, fileName) {
         const table = document.createElement('table');
         table.innerHTML = '<thead><tr><th>순</th><th>특기사항</th><th>글자 수</th></tr></thead>';
         const clonedBody = bodyTable.tBodies[0].cloneNode(true);
-        clonedBody.querySelectorAll('.filler-row, .gen-warn').forEach(r => r.remove());
+        clonedBody.querySelectorAll('.filler-row, .gen-warn, .result-copy').forEach(r => r.remove());
+        // 칸 안의 태그를 없애 글자만 남김.
+        clonedBody.querySelectorAll('.result-cell').forEach(cell => { cell.textContent = cell.textContent; });
         table.appendChild(clonedBody);
 
         const wb = XLSX.utils.book_new();
@@ -651,8 +695,8 @@ function renderSettings() {
     lucide.createIcons();
 }
 
-function removeApiKey() {
-    if (!confirm('저장된 API 키를 이 브라우저에서 지울까요?')) return;
+async function removeApiKey() {
+    if (!await showConfirm('API 키를 지울까요?', '이 브라우저에 저장된 API 키를 삭제합니다.', '키 삭제')) return;
     keepModelDraft();
     lsDel(LS_KEY);
     renderSettings();

@@ -1,0 +1,9 @@
+{
+    "version": "2.1.1",
+    "date": "2026-11-23",
+    "baseVersion": "2.1.0",
+    "baseSnapshot": "v2.1.0.json",
+    "scope": "기본 저장 지침과 실제 생성 요청에 추가되는 규칙을 함께 관리. 관리자 편집본은 수정됨으로 구분.",
+    "requestPolicySource": "async function requestGeneration(payload) {\n    const targetChars = payload.charLimit;\n    const activities = payload.activities || [];\n    const conditions = `사용자가 선택한 목표는 문단 하나당 공백 포함 ${targetChars}자임. 바이트 수가 아니라 글자 수이며, 여러 문단의 합계가 아니라 각 문단의 목표임. 아래 작성 규칙의 분량 기준에 따라 이 목표에 가깝게 작성할 것. 입력 내용에 관련된 행동·참여 태도·배운 점을 자연스럽게 풀어 쓰되 무관한 활동이나 장황한 이야기를 추가하거나 같은 내용을 반복하지 말 것.`\n        + (activities.length ? ` 선택한 활동명 ${activities.map(name => JSON.stringify(name)).join(', ')}을 빠짐없이 원래 표기대로 담을 것. 활동명의 가운뎃점은 유지할 것. 각 활동에 비슷한 분량을 배분하되 문단 전체가 목표 글자 수에 가깝도록 작성할 것.` : '');\n    const body = { ...payload,\n        cases: `${payload.cases}\\n\\n[아래는 활동 내용이 아닌 이번 생성의 작성 조건]\\n${conditions}` };\n    const res = await sendGenerationRequest(body);\n    return { ...res, result: generationLines(res.result, activities).join('\\n') };\n}",
+    "requestCountPolicy": "분량에 따른 자동 재요청 없음. 기존 생성 묶음당 1회 요청."
+}

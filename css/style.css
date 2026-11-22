@@ -272,7 +272,6 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-rule-group > b::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 2px #fef3c7, 0 0 6px #f59e0b; }
 .rc-rule-group.rc-no > b::before { background: #dc2626; box-shadow: 0 0 0 2px #fee2e2, 0 0 6px #dc2626; }
 /* 생성 결과 보조 점검 표시 */
-.gen-warn { margin-top: 8px; padding: 6px 10px; border-left: 3px solid #dc2626; background: #fef2f2; border-radius: 0 6px 6px 0; font-size: 12.5px; line-height: 1.5; color: #7f1d1d; display: flex; flex-direction: column; gap: 2px; }
 .rc-guide-body { padding: 12px 14px; }
 /* 관리자 '생활기록부 점검 지침': 영역별 최대 글자수 표 (기재요령 162쪽 표 모양) */
 .rc-limit-table { width: 100%; border-collapse: collapse; font-size: 13px; color: #334155; }
@@ -420,3 +419,41 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .pop-save { margin-top: 14px; height: 38px; border-radius: 9px; background: #334155; color: #fff; font-size: 14px; font-weight: 700; }
 .pop-save:hover { background: #253141; }
 @media (max-width: 1099px) { .settings-pop { left: 12px; right: 12px; width: auto; bottom: 116px; } }
+/* 공통 결과 복사 및 확인 모달 */
+#result-tbody .result-cell { position: relative; padding-bottom: 38px; }
+.result-copy { position: absolute; right: 10px; bottom: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 24px; padding: 3px 8px; border: 0; border-radius: 7px; background: transparent; color: #334155; font-family: inherit; font-size: 12px; line-height: 1.3; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .15s, color .15s, transform .1s; }
+.result-copy:hover { background: #334155; color: #fff; }
+.result-copy:not(:disabled):active { transform: scale(.95); }
+.result-copy:focus-visible { outline: 2px solid #334155; outline-offset: 3px; }
+.result-copy:disabled { cursor: wait; }
+.result-copy svg { width: 11px; height: 11px; }
+.result-byte-count { font-size: 12px; color: #475569; font-weight: 500; }
+.confirm-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 24px; background: #fff; color: #1e293b; box-shadow: 0 24px 80px #02061740; }
+.confirm-dialog::backdrop { background: #0f172a80; backdrop-filter: blur(6px); }
+.confirm-dialog[open] { animation: confirm-enter .18s ease-out; }
+.confirm-content { padding: 28px; }
+.confirm-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #475569; font-size: 13px; font-weight: 700; }
+.confirm-symbol { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #dbeafe; border-radius: 12px; background: #eff6ff; color: #1d4ed8; }
+.confirm-symbol svg { width: 20px; height: 20px; }
+.confirm-dialog h2 { margin: 0 0 12px; color: #0f172a; font-size: 23px; font-weight: 800; letter-spacing: -.04em; line-height: 1.4; }
+.confirm-dialog p { margin: 0; color: #475569; font-size: 15px; line-height: 1.85; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
+.confirm-preview { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding: 18px 22px; border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc; }
+.confirm-preview[hidden] { display: none; }
+.confirm-preview div { display: grid; gap: 5px; }
+.confirm-preview div:last-child { text-align: right; }
+.confirm-preview div span { color: #475569; font-size: 12px; font-weight: 600; }
+.confirm-preview strong { color: #0f172a; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.confirm-arrow { color: #64748b; font-size: 24px; }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 18px 28px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.confirm-actions button { min-height: 44px; padding: 0 18px; border: 1px solid #cbd5e1; border-radius: 11px; font-size: 14px; font-weight: 700; transition: background-color .15s, box-shadow .15s; }
+.confirm-cancel { background: #fff; color: #334155; }
+.confirm-cancel:hover { background: #f1f5f9; }
+.confirm-actions .confirm-primary { border-color: #1e293b; background: #1e293b; color: #fff; box-shadow: 0 2px 4px #0f172a1a; }
+.confirm-actions .confirm-primary:hover { background: #334155; }
+.confirm-actions button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+@keyframes confirm-enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .confirm-dialog[open] { animation: none; } }
+@media (max-width: 480px) { .confirm-content { padding: 22px; } .confirm-actions { padding: 16px 22px; } .guide-versions { margin-right: 0; } }
+
+
+.release-version { display: inline-flex; align-items: center; gap: 6px; margin: 0 auto 12px; padding: 5px 10px; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; font-size: 13px; font-weight: 700; background: #24334b; }
