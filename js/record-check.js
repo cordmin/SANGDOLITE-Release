@@ -281,7 +281,8 @@ function rcParseRows(rows, sheetName = '', fileName = '') {
         let name = cell(r, col.name);
         if (!name) {
             if (!newKind || !carry.name) {
-                if (text && last) last.text += text;
+                // 동아리마다 따로 있는 엑셀 줄('(동아리)(1시간) …')은 줄을 바꿔 잇고, 쪽 넘김으로 잘린 글은 그대로 이어 붙임
+                if (text && last) last.text += (new RegExp('^' + RC_AUTO_HEAD.source).test(text) ? '\n' : '') + text;
                 continue;
             }
             name = carry.name;
@@ -514,20 +515,25 @@ function rcPdfBody(lines) {
 
 // PDF 줄바꿈 자리 띄어쓰기: 붙인 말이 사전에 있으면 붙이고(설+명하는), 두 조각이 각각 사전에 있으면 띄우고(생각과 기억이),
 // 둘 다 아니거나 사전이 없으면 끝말 짐작(rcWrapSpace)대로. known: 사전에 그대로 있는 낱말 모음(Set) 또는 null
-const RC_WRAP_SP = '⁣', RC_WRAP_NO = '⁤';
-const RC_WRAP_PAIR = /([가-힣A-Za-z0-9]+)([⁣⁤])([가-힣A-Za-z0-9]+)/g;
+const RC_WRAP_SP = '\u2063', RC_WRAP_NO = '\u2064';
+// 사전에 없는 합성어 꼬리: 다음 줄 첫머리가 '관을·기의·별·적인'처럼 뒤에 붙는 말(+조사)뿐이면 붙임 (인성+관을)
+const RC_WRAP_SUFFIX = /^(?:관|기|별|적|력|성|화|감|법|형|권|률|율|론|점)(?:을|를|이|가|은|는|의|에|과|와|로|으로|인|도|만|에서)?$/;
+const RC_WRAP_PAIR = /([가-힣A-Za-z0-9]+)([\u2063\u2064])([가-힣A-Za-z0-9]+)/g;
 function rcWrapWords(records) {
     const words = new Set();
     for (const rec of records) for (const [, a, , b] of rec.text.matchAll(RC_WRAP_PAIR)) words.add(a).add(b).add(a + b);
     return [...words];
 }
+// 나이스는 글자 단위로 줄을 바꿔 '활|동지에', '현|실감'처럼 한 글자가 줄 끝에 남음. 한 글자는 혼자 쓰는 말일 때만 낱말로 봄
+const RC_WRAP_ONE = '및더수것등각첫두세네그저잘못또꼭늘곧좀새온큰후중전때속시내한할반힘컷열';
 function rcResolveWraps(records, known) {
+    const word = w => known.has(w) && (w.length > 1 || RC_WRAP_ONE.includes(w));
     return records.map(rec => ({
         ...rec,
         text: rec.text.replace(RC_WRAP_PAIR, (m, a, mark, b) => {
-            const sp = known && (known.has(a + b) || RC_NEXT_JOSA.test(b)) ? false : known && known.has(a) && known.has(b) ? true : mark === RC_WRAP_SP;
+            const sp = known && (known.has(a + b) || RC_NEXT_JOSA.test(b) || RC_WRAP_SUFFIX.test(b)) ? false : known && word(a) && word(b) ? true : mark === RC_WRAP_SP;
             return a + (sp ? ' ' : '') + b;
-        }).replace(/[⁣⁤]/g, m => (m === RC_WRAP_SP ? ' ' : ''))
+        }).replace(/[\u2063\u2064]/g, m => (m === RC_WRAP_SP ? ' ' : ''))
     }));
 }
 
@@ -775,6 +781,8 @@ function rcCheckOne(rec, settings, byteLen) {
         let prev = null; // '경진대회'처럼 같은 규칙 낱말이 바로 붙어 나오면 하나로 합침
         for (const m of text.matchAll(rule.re)) {
             if (rule.skip && rule.skip.test(m[0])) continue;
+            // '방과후학교스포츠클럽'은 정규교육과정 밖의 학교스포츠클럽 활동이라 방과후학교 수강과 다름 (나이스가 동아리 머리말에 붙임)
+            if (/^\s*스포츠\s*클럽/.test(text.slice(m.index + m[0].length))) continue;
             if (prev && prev.end === m.index) { prev.issue.what += m[0]; prev.end += m[0].length; continue; }
             add('forbid', rule.level, m[0], rule.why);
             prev = { issue: issues[issues.length - 1], end: m.index + m[0].length };
@@ -799,7 +807,7 @@ function rcCheckOne(rec, settings, byteLen) {
     }
 
     // 문장 끝맺음: 특기사항은 '~함.', '~임.'처럼 명사형으로 끝내고 마침표를 찍음
-    const sentences = text.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean);
+    const sentences = rcStripAutoHead(text).split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean);
     sentences.forEach((s, i) => {
         const tail = s.slice(-12);
         if (/[다요]\.?$/.test(s)) add('ending', 'check', tail, "'~다.'로 끝났어요. '~함.', '~임.'처럼 끝맺어 주세요.");
@@ -811,8 +819,13 @@ function rcCheckOne(rec, settings, byteLen) {
 }
 
 // 문단과 문장을 원문 그대로 비교함. 양끝 공백과 줄바꿈 형식만 정리함.
+// 나이스가 동아리·주제선택 활동 앞에 자동으로 붙이는 머리말 '(동아리 이름)(18시간)', '(… : 방과후학교스포츠클럽)(1시간)'
+// ('(애니연구 : 자율동아리)'처럼 시간 없이 붙기도 함). 같은 동아리 학생끼리 똑같고 마침표도 없어서, 똑같은 문장·문장 끝 점검에서는 빼고 봄
+const RC_AUTO_HEAD = /\((?:[^()\n]|\([^()\n]*\))*\)\s*\(\d+\s*시간\)|\((?:[^()\n]|\([^()\n]*\))*:\s*[가-힣\s]*(?:동아리|스포츠\s*클럽)\s*\)/g;
+const rcStripAutoHead = text => text.replace(RC_AUTO_HEAD, '\n');
+
 function rcExactPassages(text) {
-    const paragraphs = text.replace(/\r\n?/g, '\n').split(/\n+/).map(s => s.trim()).filter(Boolean);
+    const paragraphs = rcStripAutoHead(text).replace(/\r\n?/g, '\n').split(/\n+/).map(s => s.trim()).filter(Boolean);
     const sentences = paragraphs.flatMap(p => p.split(/(?<=[.!?])(?=\s|[가-힣])/).map(s => s.trim()).filter(Boolean));
     // '1.', '★'처럼 글자가 거의 없는 조각은 비교하지 않음 (번호만 같아도 똑같은 문장으로 잡히던 문제)
     return new Set([...paragraphs, ...sentences].filter(p => (p.match(/[가-힣A-Za-z]/g) || []).length >= 5));

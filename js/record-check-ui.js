@@ -30,11 +30,13 @@ function showToast(text, type = '') {
 }
 
 // ───────── 파일 올리기 ─────────
-// 파일은 한 번에 하나만 점검함. 여러 개를 고르면 처음 읽힌 파일 하나만 불러옴
+// 파일은 한 번에 하나만 점검함. 여러 개를 고르면 처음 읽힌 파일 하나만 불러옴.
+// 이미 불러온 파일이 있으면 새 파일을 다 읽은 뒤 그 파일로 바꿈 (새 파일을 못 읽으면 지금 파일 그대로)
 async function rcAddFiles(list) {
-    if (rcFiles.length) { showToast('파일은 하나만 불러올 수 있어요. 지금 파일을 닫은 뒤 새 파일을 불러와 주세요.'); return; }
+    const before = rcFiles[0];
+    let loaded = null;
     for (const file of list) {
-        if (rcFiles.length) { showToast(`파일은 하나만 불러올 수 있어서 '${rcFiles[0].name}'만 불러왔어요.`); break; }
+        if (loaded) { showToast(`파일은 하나만 불러올 수 있어서 '${loaded.name}'만 불러왔어요.`); break; }
         const isPdf = /\.pdf$/i.test(file.name);
         if (!isPdf && !/\.xlsx?$/i.test(file.name)) { rcLoadFail(file.name, '엑셀(.xlsx, .xls)이나 PDF 파일만 읽을 수 있어요.\nNEIS(나이스)에서 내려받은 생활기록부 파일을 올려 주세요.'); continue; }
         try {
@@ -62,7 +64,8 @@ async function rcAddFiles(list) {
                     : "'성명' 칸이 있는 NEIS(나이스) 생활기록부 엑셀을 올려 주세요.");
                 continue;
             }
-            rcFiles.push({ name: file.name, records, isPdf });
+            loaded = { name: file.name, records, isPdf };
+            rcFiles = [loaded];
             rcRunVersion++;
             rcChecking = false;
             rcResults = null;
@@ -73,7 +76,9 @@ async function rcAddFiles(list) {
     }
     rcRenderFiles();
     rcRenderResults();
-    if (rcFiles.length) rcRun(); // 불러오면 바로 점검 (맨 앞에서 이미 파일이 있으면 돌아가므로 여기 오면 새 파일)
+    if (!loaded) return;
+    if (before && list.length === 1) showToast(`'${loaded.name}'(으)로 바꿔 불러왔어요.`);
+    rcRun(); // 불러오면 바로 점검
 }
 
 // PDF 줄바꿈 자리 띄어쓰기를 사전으로 정함. 사전을 못 쓰면 끝말 짐작대로
