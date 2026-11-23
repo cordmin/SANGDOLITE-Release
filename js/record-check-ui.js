@@ -120,9 +120,9 @@ async function rcPdfLines(file) {
         const { items } = await page.getTextContent();
         const vp = page.getViewport({ scale: 1 });
         // pdf.js는 줄 끝 띄어쓰기를 버림 → 그리기 명령 원문에서 낱말 뒤 띄어쓰기를 되찾음
-        let raw = '';
+        let raw = '', ops = null;
         try {
-            const ops = await page.getOperatorList();
+            ops = await page.getOperatorList();
             ops.fnArray.forEach((fn, i) => {
                 if (fn !== pdfjsLib.OPS.showText && fn !== pdfjsLib.OPS.showSpacedText) return;
                 for (const g of ops.argsArray[i][0]) if (g && typeof g === 'object' && g.unicode) raw += g.unicode;
@@ -142,7 +142,10 @@ async function rcPdfLines(file) {
             const t = pdfjsLib.Util.transform(vp.transform, it.transform);
             parts.push({ s: it.str, x: t[4], y: vp.height - t[5], w: it.width || 0, h: Math.hypot(t[2], t[3]) || 10, sp, spAfter });
         }
-        pages.push(rcGroupLines(parts));
+        const lines = rcGroupLines(parts);
+        // 표 칸(네모) 위치: 어느 줄이 어느 학생·영역 칸에 들었는지 정확히 가림 (못 읽으면 글 위치로 짐작)
+        try { if (ops) lines.rects = rcPdfRects(ops, pdfjsLib, vp); } catch { /* 짐작으로 읽음 */ }
+        pages.push(lines);
     }
     return pages;
 }
