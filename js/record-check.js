@@ -647,7 +647,8 @@ function rcCheckOne(rec, settings, byteLen) {
     const add = (type, level, what, why, fix) => issues.push({ type, level, what, why, fix });
 
     if (!text.trim()) {
-        add('empty', 'no', '', '기록이 비어 있어요.');
+        // 교과학습발달상황 두 항목은 안 쓴 경우가 많아서 비어 있어도 오류로 보지 않음
+        if (rec.area !== RC_SETUK && rec.area !== RC_PERSONAL) add('empty', 'no', '', '기록이 비어 있어요.');
         return issues;
     }
 
