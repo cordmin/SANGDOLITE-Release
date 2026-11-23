@@ -25,10 +25,12 @@ function rcKnown(dictionary, word, depth = 0) {
     return false;
 }
 
-self.onmessage = async ({ data: { id, words } }) => {
+self.onmessage = async ({ data: { id, words, exact } }) => {
     try {
         ready ||= loadDictionary().catch(error => { ready = null; throw error; });
         const dictionary = await ready;
+        // exact: 나누지 않고 사전에 그대로 있는 낱말만 돌려줌 (PDF 줄바꿈 띄어쓰기 판단용)
+        if (exact) return self.postMessage({ id, known: words.filter(word => dictionary.testSpelling(word)) });
         const spellings = {};
         for (const word of words) {
             if (!cache.has(word)) {

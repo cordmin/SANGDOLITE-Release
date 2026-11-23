@@ -505,8 +505,30 @@ function rcPdfBody(lines) {
         const p = lines[i - 1];
         if (!p) return l.text;
         if (p.page === l.page && p.y - l.y > lineGap * 1.6) return out + '\n' + l.text;
-        return out + (rcWrapSpace(p.text, l.text, p.endSp) ? ' ' : '') + l.text;
+        const sp = rcWrapSpace(p.text, l.text, p.endSp);
+        // 글자끼리 맞닿은 줄바꿈은 짐작 표시를 남겨 두고 사전으로 다시 정함 (rcResolveWraps)
+        const unsure = !p.endSp && /[가-힣A-Za-z0-9]$/.test(p.text) && /^[가-힣A-Za-z0-9]/.test(l.text);
+        return out + (unsure ? (sp ? RC_WRAP_SP : RC_WRAP_NO) : sp ? ' ' : '') + l.text;
     }, '');
+}
+
+// PDF 줄바꿈 자리 띄어쓰기: 붙인 말이 사전에 있으면 붙이고(설+명하는), 두 조각이 각각 사전에 있으면 띄우고(생각과 기억이),
+// 둘 다 아니거나 사전이 없으면 끝말 짐작(rcWrapSpace)대로. known: 사전에 그대로 있는 낱말 모음(Set) 또는 null
+const RC_WRAP_SP = '⁣', RC_WRAP_NO = '⁤';
+const RC_WRAP_PAIR = /([가-힣A-Za-z0-9]+)([⁣⁤])([가-힣A-Za-z0-9]+)/g;
+function rcWrapWords(records) {
+    const words = new Set();
+    for (const rec of records) for (const [, a, , b] of rec.text.matchAll(RC_WRAP_PAIR)) words.add(a).add(b).add(a + b);
+    return [...words];
+}
+function rcResolveWraps(records, known) {
+    return records.map(rec => ({
+        ...rec,
+        text: rec.text.replace(RC_WRAP_PAIR, (m, a, mark, b) => {
+            const sp = known && (known.has(a + b) || RC_NEXT_JOSA.test(b)) ? false : known && known.has(a) && known.has(b) ? true : mark === RC_WRAP_SP;
+            return a + (sp ? ' ' : '') + b;
+        }).replace(/[⁣⁤]/g, m => (m === RC_WRAP_SP ? ' ' : ''))
+    }));
 }
 
 // PDF 그리기 명령에서 표 칸(네모)을 꺼냄. 좌표는 글 조각과 같은 화면 기준(y는 아래에서부터)
@@ -839,4 +861,4 @@ function rcHighlight(text, issues) {
     return html.replace(re, m => `<mark class="rc-mark rc-${levelOf(raw.get(m))}">${m}</mark>`).replace(/\n/g, '<br>');
 }
 
-if (typeof module !== 'undefined') module.exports = { RC_DEFAULT_SETTINGS, RC_DEFAULT_GUIDE, rcApplyGuide, rcPattern, RC_TYPES, rcParseRows, rcParsePdfLines, rcGroupLines, rcPdfRects, rcPdfTable, rcCheckOne, rcCheckAll, rcHighlight, rcGuessArea };
+if (typeof module !== 'undefined') module.exports = { RC_DEFAULT_SETTINGS, RC_DEFAULT_GUIDE, rcApplyGuide, rcPattern, RC_TYPES, rcParseRows, rcParsePdfLines, rcGroupLines, rcPdfRects, rcPdfTable, rcWrapWords, rcResolveWraps, rcCheckOne, rcCheckAll, rcHighlight, rcGuessArea };

@@ -47,6 +47,7 @@ async function rcAddFiles(list) {
                     const rows = rcPdfTable(pages);
                     records = rows ? rcParseRows(rows, '', file.name) : [];
                     if (!records.length) records = rcParsePdfLines(pages, file.name);
+                    records = await rcFixWraps(records);
                 } finally { rcLoading(null); }
             } else {
                 const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
@@ -73,6 +74,14 @@ async function rcAddFiles(list) {
     rcRenderFiles();
     rcRenderResults();
     if (rcFiles.length) rcRun(); // 불러오면 바로 점검 (맨 앞에서 이미 파일이 있으면 돌아가므로 여기 오면 새 파일)
+}
+
+// PDF 줄바꿈 자리 띄어쓰기를 사전으로 정함. 사전을 못 쓰면 끝말 짐작대로
+async function rcFixWraps(records) {
+    const words = rcWrapWords(records);
+    let known = null;
+    if (words.length) try { known = await rcKnownWords(words); } catch { known = null; }
+    return rcResolveWraps(records, known);
 }
 
 // 불러오기 실패 창: 어떤 파일인지와 무엇을 올리면 되는지 알려 줌
