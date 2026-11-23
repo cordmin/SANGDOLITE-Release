@@ -248,7 +248,7 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-fix li.rc-no .rc-tag { background: #fee2e2; color: #b91c1c; }
 .rc-tag { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; line-height: 1.5; vertical-align: 1px; white-space: nowrap; }
 .rc-blank { color: #94a3b8; }
-.rc-empty { text-align: center !important; color: #64748b; font-weight: 600; vertical-align: middle !important; }
+.rc-empty { text-align: center !important; color: #64748b; font-size: 19px !important; font-weight: 600; vertical-align: middle !important; }
 .rc-help { font-size: 13px; line-height: 1.6; color: #475569; }
 .rc-field { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 13.5px; font-weight: 700; color: #334155; }
 .rc-input-unit { display: inline-flex; align-items: center; gap: 8px; }
@@ -355,8 +355,8 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-delete-dialog h2 { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
 .rc-delete-dialog p { font-size: 14px; line-height: 1.7; }
 .rc-delete-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
-#rc-close-dialog, .rc-fail-dialog { text-align: center; }
-#rc-close-dialog .rc-delete-actions, .rc-fail-dialog .rc-delete-actions { justify-content: center; }
+.rc-fail-dialog { text-align: center; }
+.rc-fail-dialog .rc-delete-actions { justify-content: center; }
 /* 한 문장씩 한 줄로: 줄바꿈(
 )을 그대로 보여 주고, 가장 긴 문장이 한 줄에 들어가게 창을 조금 넓힘 */
 .rc-fail-dialog { width: min(440px, calc(100vw - 32px)); }
@@ -400,7 +400,8 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-table thead th:last-child { border-top-right-radius: 11px; }
 
 /* 알림 토스트: 화면 아래 가운데에 잠깐 떴다가 사라짐 */
-.toast { position: fixed; left: 50%; bottom: 32px; z-index: 1000; max-width: min(520px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 12px; background: #1e293b; color: #fff; font-size: 14px; font-weight: 600; line-height: 1.5; box-shadow: 0 12px 32px rgba(15, 23, 42, .28); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s, transform .2s; word-break: keep-all; }
+/* 알림: 화면 위(머리 띠 56px 아래)에서 아래로 내려옴 */
+.toast { position: fixed; left: 50%; top: 72px; z-index: 1000; max-width: min(600px, calc(100vw - 32px)); padding: 14px 22px; border-radius: 12px; background: #1e293b; color: #fff; font-size: 16px; font-weight: 600; line-height: 1.5; box-shadow: 0 12px 32px rgba(15, 23, 42, .28); opacity: 0; transform: translate(-50%, -24px); pointer-events: none; transition: opacity .25s, transform .25s; word-break: keep-all; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.error { background: #7f1d1d; }
 
@@ -453,6 +454,12 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .confirm-actions button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
 @keyframes confirm-enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .confirm-dialog[open] { animation: none; } }
+/* 보조 점검 종료 확인: 같은 테마에 글씨만 크게 */
+.rc-close-dialog .confirm-content { text-align: center; }
+.rc-close-dialog .confirm-actions { justify-content: center; }
+.rc-close-dialog h2 { font-size: 24px; }
+.rc-close-dialog p { font-size: 17px; color: #334155; }
+.rc-close-dialog .confirm-actions button { min-height: 46px; padding: 0 22px; font-size: 15px; }
 @media (max-width: 480px) { .confirm-content { padding: 22px; } .confirm-actions { padding: 16px 22px; } .guide-versions { margin-right: 0; } }
 
 

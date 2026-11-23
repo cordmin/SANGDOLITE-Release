@@ -42,7 +42,7 @@ async function rcAddFiles(list) {
         try {
             let records;
             if (isPdf) {
-                rcLoading('파일을 읽는 중이에요', file.name);
+                rcLoading('파일을 읽는 중이에요', file.name, 0, 50);
                 try {
                     const pages = await rcPdfLines(file);
                     // 반 전체 표 모양 PDF는 엑셀처럼 표로 되살려 읽고, 아니면(학생 한 명씩) 줄 글로 읽음
@@ -78,7 +78,7 @@ async function rcAddFiles(list) {
     rcRenderResults();
     if (!loaded) return;
     if (before && list.length === 1) showToast(`'${loaded.name}'(으)로 바꿔 불러왔어요.`);
-    rcRun(); // 불러오면 바로 점검
+    rcRun(loaded.isPdf ? rcBarP : 0); // 불러오면 바로 점검 (PDF는 읽기에서 멈춘 자리부터 이어서)
 }
 
 // PDF 줄바꿈 자리 띄어쓰기를 사전으로 정함. 사전을 못 쓰면 끝말 짐작대로
@@ -178,7 +178,7 @@ function rcRemoveFile(i) {
 let rcClosing = null;
 function rcAskClose(i) {
     rcClosing = rcFiles[i];
-    document.getElementById('rc-close-description').textContent = `‘${rcClosing.name}’을(를) 닫으면 이 파일의 점검 결과도 함께 사라져요.`;
+    document.getElementById('rc-close-description').textContent = `‘${rcClosing.name}’을(를) 닫으면\n이 파일의 점검 결과도 함께 사라져요.`;   // 이름이 길어도 '닫으면' 다음에서 줄을 바꿈
     document.getElementById('rc-close-dialog').showModal();
 }
 
@@ -200,36 +200,38 @@ function rcRenderFiles() {
     if (window.lucide) lucide.createIcons();
 }
 
-// 표 가운데 로딩 표시 (text가 없으면 숨김)
-// ponytail: 맞춤법 검사는 한 번에 끝나서 실제 진행률을 모름 → 처음엔 빠르게, 90%에 가까울수록 천천히 차게 함
-let rcBarTimer = null;
-function rcLoading(text, sub = '') {
+// 표 가운데 로딩 표시 (text가 없으면 숨김). from%에서 시작해 to%에 가까워짐
+// PDF는 '읽기(0→50%)' 다음 '점검'을 읽기가 멈춘 자리부터 이어 감 (단계마다 0%로 돌아가지 않게)
+// ponytail: 맞춤법 검사는 한 번에 끝나서 실제 진행률을 모름 → 처음엔 빠르게, 목표에 가까울수록 천천히 차게 함
+let rcBarTimer = null, rcBarP = 0;   // rcBarP: 막대가 마지막으로 그린 진행률
+function rcLoading(text, sub = '', from = 0, to = 90) {
     const box = document.getElementById('rc-loading');
     box.hidden = !text;
     document.getElementById('rc-drop').classList.toggle('loading', !!text);
     clearInterval(rcBarTimer);
     if (!text) return;
-    let p = 0;
+    let p = from;
     const draw = () => {
+        rcBarP = p;
         document.getElementById('rc-bar-fill').style.width = p + '%';
         document.getElementById('rc-pencil').style.left = p + '%';
         document.getElementById('rc-bar-pct').style.left = p + '%';
         document.getElementById('rc-bar-pct').textContent = Math.round(p) + '%';
     };
     draw();
-    rcBarTimer = setInterval(() => { p += (90 - p) * 0.06; draw(); }, 150);
+    rcBarTimer = setInterval(() => { p += (to - p) * 0.06; draw(); }, 150);
     document.getElementById('rc-loading-text').textContent = text;
     document.getElementById('rc-loading-sub').textContent = sub;
 }
 
-async function rcRun() {
+async function rcRun(barFrom = 0) {
     if (!rcFiles.length) return;
     const version = ++rcRunVersion;
     const files = [...rcFiles];
     const records = files.flatMap(f => f.records);
     rcChecking = true;
     rcRenderFiles();
-    rcLoading('점검하는 중이에요');
+    rcLoading('점검하는 중이에요', '', barFrom);
     try {
         const spellings = await rcCheckSpelling(records);
         if (version !== rcRunVersion || files.length !== rcFiles.length || files.some((file, i) => file !== rcFiles[i])) return;
@@ -297,7 +299,7 @@ function rcRenderResults() {
     const q = rcQuery.trim();
     const rows = rcVisibleRows();
     if (!rows.length) {
-        tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty">${q ? '찾는 학생이 없어요.' : '이 항목에서 고칠 곳이 없어요.'}</td></tr>`;
+        tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty">${q ? '찾는 학생이 없어요.' : '충성! 보조 점검 결과 이상 없습니다!'}</td></tr>`;
         return;
     }
     tbody.innerHTML = rows.map(r => {

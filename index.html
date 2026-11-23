@@ -14,7 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
     <!-- ?v= 숫자: 파일을 고쳐 올릴 때마다 바꾸면 브라우저가 예전 파일 대신 새 파일을 받아요 -->
-    <link rel="stylesheet" href="css/style.css?v=20261123-release-2.1.9">
+    <link rel="stylesheet" href="css/style.css?v=20261123-release-empty-msg">
 </head>
 <body class="min-h-screen min-[1100px]:h-screen min-[1100px]:overflow-hidden bg-[#0f172a] text-[#1e293b] flex flex-col min-[1100px]:flex-row">
 
@@ -43,12 +43,14 @@
         </div>
     </div>
 
-    <dialog id="rc-close-dialog" class="rc-delete-dialog" aria-labelledby="rc-close-title" aria-describedby="rc-close-description">
-        <h2 id="rc-close-title">생활기록부 점검을 마치셨나요?</h2>
-        <p id="rc-close-description"></p>
-        <div class="rc-delete-actions">
-            <button type="button" class="guide-btn" autofocus onclick="document.getElementById('rc-close-dialog').close()">계속 볼게요</button>
-            <button type="button" class="guide-btn danger" onclick="rcConfirmClose()">종료하기</button>
+    <dialog id="rc-close-dialog" class="confirm-dialog rc-close-dialog" aria-labelledby="rc-close-title" aria-describedby="rc-close-description">
+        <div class="confirm-content">
+            <h2 id="rc-close-title">생활기록부 점검을 마치셨나요?</h2>
+            <p id="rc-close-description"></p>
+        </div>
+        <div class="confirm-actions">
+            <button type="button" class="confirm-cancel" autofocus onclick="document.getElementById('rc-close-dialog').close()">취소</button>
+            <button type="button" class="confirm-primary" onclick="rcConfirmClose()">점검 종료</button>
         </div>
     </dialog>
 
@@ -327,7 +329,7 @@
                 </div>
                 <div class="flex-1 min-h-0 overflow-auto custom-scrollbar" style="scrollbar-gutter: stable;">
                 <table class="excel-table rc-table" style="table-layout: fixed; min-width: 760px; height: 100%;">
-                    <colgroup><col style="width:76px"><col style="width:72px"><col style="width:132px"><col><col><col style="width:76px"></colgroup>
+                    <colgroup><col style="width:76px"><col style="width:72px"><col style="width:132px"><col><col><col style="width:96px"></colgroup>
                     <thead><tr><th>이름</th><th>학번</th><th>항목</th><th>기록 내용</th><th>점검 결과</th><th class="excel-byte">글자 수</th></tr></thead>
                     <tbody id="rc-tbody"></tbody>
                 </table>
@@ -340,6 +342,6 @@
     <script src="js/app.js?v=20261123-release-2.1.9"></script>
     <script src="js/record-check.js?v=20261123-release-club-heads"></script>
     <script src="js/record-spell.js?v=20261123-release-neis-layout"></script>
-    <script src="js/record-check-ui.js?v=20261123-release-club-heads"></script>
+    <script src="js/record-check-ui.js?v=20261123-release-empty-msg"></script>
 </body>
 </html>
