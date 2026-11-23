@@ -291,7 +291,7 @@ function rcRenderResults() {
     document.getElementById('rc-import').hidden = !!(rcResults || rcFiles.length);
 
     if (!rcResults) {
-        const ready = rcFiles.length ? `<td colspan="6" class="rc-empty">점검 결과가 없어요. 파일을 닫고 다시 불러오면 다시 점검해요.</td>` : '<td colspan="6"></td>';
+        const ready = rcFiles.length ? `<td colspan="6" class="rc-empty"><span class="rc-empty-msg">점검 결과가 없어요. 파일을 닫고 다시 불러오면 다시 점검해요.</span></td>` : '<td colspan="6"></td>';
         tbody.innerHTML = `<tr class="filler-row" style="height:100%">${ready}</tr>`;
         return;
     }
@@ -299,7 +299,7 @@ function rcRenderResults() {
     const q = rcQuery.trim();
     const rows = rcVisibleRows();
     if (!rows.length) {
-        tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty">${q ? '찾는 학생이 없어요.' : '충성! 보조 점검 결과 이상 없습니다!'}</td></tr>`;
+        tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty"><span class="rc-empty-msg">${q ? '찾는 학생이 없어요.' : '충성! 보조 점검 결과 이상 없습니다!'}</span></td></tr>`;
         return;
     }
     tbody.innerHTML = rows.map(r => {

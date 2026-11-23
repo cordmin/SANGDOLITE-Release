@@ -238,6 +238,8 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-table .rc-who small, .rc-table .rc-where small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; line-height: 1.4; }
 .rc-table .rc-text { word-break: keep-all; overflow-wrap: anywhere; }
 .rc-table td.excel-byte { vertical-align: middle; }
+/* 빈 결과 안내문: 표 머리줄 아래 빈 곳의 세로·가로 가운데 (#rc-drop 기준으로 띄움) */
+.rc-empty-msg { position: absolute; inset: 34px 8px 0 0; display: grid; place-items: center; padding: 0 24px; pointer-events: none; }
 .rc-table td.rc-who, .rc-table td.rc-id, .rc-table td.rc-where { text-align: center; vertical-align: middle; }
 .rc-table td.rc-where span { display: block; white-space: nowrap; font-size: 13px; line-height: 1.5; color: #334155; }
 .rc-mark { border-radius: 3px; padding: 0 1px; }
