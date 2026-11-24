@@ -346,32 +346,31 @@ function rcSearch(v) {
     rcRenderResults();
 }
 
-// 결과 내려받기(PDF)·인쇄하기: 고른 점검 영역(types, 없으면 지금 필터 그대로)의 표를 화면과 같은 모양으로 숨은 틀에 옮겨 인쇄창을 띄움 → 'PDF로 저장' 또는 프린터
-// ponytail: 브라우저 인쇄 기능을 씀. 사용자가 인쇄창에서 'PDF로 저장'을 골라야 함 (바로 파일로 떨어뜨리려면 PDF 라이브러리가 필요)
-function rcExport(types) {
-    if (!rcResults) return;
-    const rows = types ? rcVisibleRows(true, types) : rcVisibleRows(true);
-    if (!rows.length) { showModal('알림', '지금 화면에 내려받을 내용이 없어요.', 'info'); return; }
+// 결과 내려받기(PDF)·인쇄하기: 고른 점검 영역(types)의 표를 화면과 같은 모양(.rc-sheet)으로 만듦
+function rcSheetTable(rows) {
     const screen = document.querySelector('#check-result .rc-table');
-    const table = `<table class="excel-table rc-table">${screen.querySelector('colgroup').outerHTML}${screen.querySelector('thead').outerHTML}<tbody>${rows.map(rcRowHtml).join('')}</tbody></table>`;
-    const picked = types ? (types.length === Object.keys(RC_TYPES).filter(t => rcCount(t)).length ? [] : types) : rcTab === 'all' ? [] : [rcTab];
-    const title = ['생기부_점검결과', ...picked.map(t => RC_TYPES[t])].join('_');
+    return `<table class="excel-table rc-table rc-sheet">${screen.querySelector('colgroup').outerHTML}${screen.querySelector('thead').outerHTML}<tbody>${rows.map(rcRowHtml).join('')}</tbody></table>`;
+}
+function rcSheetTitle(types) {
+    const all = types.length === Object.keys(RC_TYPES).filter(t => rcCount(t)).length;
+    return ['생기부_점검결과', ...(all ? [] : types.map(t => RC_TYPES[t]))].join('_');
+}
+
+// 인쇄하기: 숨은 틀에 표를 옮겨 인쇄창을 띄움 (A4 가로)
+function rcPrint(types) {
+    const rows = rcVisibleRows(true, types);
+    if (!rows.length) { showModal('알림', '인쇄할 내용이 없어요.', 'info'); return; }
     const css = [...document.querySelectorAll('link[rel="stylesheet"]')].map(l => `<link rel="stylesheet" href="${l.href}">`).join('');
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     document.body.appendChild(frame);
     const doc = frame.contentDocument;
     doc.open();
-    doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${rcEscape(title)}</title>${css}<style>
+    doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${rcEscape(rcSheetTitle(types))}</title>${css}<style>
         @page { size: A4 landscape; margin: 10mm; }
-        body { margin: 0; font-family: Pretendard, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .rc-table { table-layout: fixed; width: 100%; border: 1px solid #334155; }
-        .rc-table th { position: static; }
-        .rc-table tr { break-inside: avoid; }
-        .rc-table tr:last-child td { border-bottom: 1px solid #94a3b8; }
-        .rc-fix ul { list-style: none; margin: 0; padding: 0; }
-        .rc-dup-name { cursor: default; }
-    </style></head><body>${table}</body></html>`);
+        body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .rc-sheet tr { break-inside: avoid; }
+    </style></head><body>${rcSheetTable(rows)}</body></html>`);
     doc.close();
     frame.contentWindow.onafterprint = () => setTimeout(() => frame.remove());
     // 글꼴·스타일을 다 받은 뒤 인쇄 (안 그러면 밑줄·색 없이 찍힐 수 있음)
@@ -379,11 +378,87 @@ function rcExport(types) {
     frame.contentWindow.addEventListener('load', () => (doc.fonts ? doc.fonts.ready : Promise.resolve()).then(print), { once: true });
 }
 
-// 인쇄하기: 결과가 있는 점검 영역만 골라서 인쇄 (처음엔 모두 고름)
-function rcAskPrint() {
+// PDF 만드는 도구는 처음 내려받을 때만 불러옴
+const RC_PDF_LIBS = ['https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js'];
+let rcPdfLibsReady = null;
+function rcLoadPdfLibs() {
+    rcPdfLibsReady ||= Promise.all(RC_PDF_LIBS.map(src => new Promise((ok, fail) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = ok;
+        s.onerror = () => fail(new Error('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));
+        document.head.appendChild(s);
+    }))).catch(e => { rcPdfLibsReady = null; throw e; });
+    return rcPdfLibsReady;
+}
+
+// PDF 그림에 넣을 Pretendard 글꼴 (표에 쓰는 굵기만). 글꼴 파일이 다른 사이트에 있어 도구가 스스로 못 읽음 → 직접 받아 끼움
+const RC_PDF_FONT = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-';
+let rcPdfFont = null;
+function rcPdfFontCss() {
+    rcPdfFont ||= Promise.all([[400, 'Regular'], [600, 'SemiBold'], [700, 'Bold']].map(async ([weight, name]) => {
+        const blob = await (await fetch(RC_PDF_FONT + name + '.woff2')).blob();
+        const url = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+        return `@font-face{font-family:Pretendard;font-weight:${weight};src:url(${url}) format('woff2')}`;
+    })).then(css => css.join('')).catch(e => { rcPdfFont = null; throw e; });
+    return rcPdfFont;
+}
+
+// 내려받기: 화면과 같은 표를 A4 가로 쪽마다 그림으로 찍어 PDF 파일로 바로 저장
+// ponytail: 쪽마다 그림이라 PDF 안 글자는 고를 수 없음. 한 학생 줄이 한 쪽보다 길면 그 쪽만 줄여서 담음
+const RC_PDF = { w: 297, h: 210, margin: 10, px: 96 / 25.4 };   // mm, 1mm = 3.78px
+async function rcDownloadPdf(types) {
+    const rows = rcVisibleRows(true, types);
+    if (!rows.length) { showModal('알림', '내려받을 내용이 없어요.', 'info'); return; }
+    const box = document.createElement('div');
+    box.style.cssText = `position:fixed;left:-30000px;top:0;width:${Math.round((RC_PDF.w - RC_PDF.margin * 2) * RC_PDF.px)}px;background:#fff`;
+    rcLoading('PDF를 만드는 중이에요');
+    try {
+        await rcLoadPdfLibs();
+        box.innerHTML = rcSheetTable(rows);
+        document.body.appendChild(box);
+        await document.fonts.ready;
+        // 한 쪽에 들어갈 만큼씩 줄을 나눔 (제목 줄은 쪽마다 다시)
+        const table = box.firstElementChild;
+        const pageH = (RC_PDF.h - RC_PDF.margin * 2) * RC_PDF.px - table.tHead.offsetHeight - 2;
+        const pages = [[]];
+        let used = 0;
+        [...table.tBodies[0].rows].forEach(tr => {
+            if (used + tr.offsetHeight > pageH && pages.at(-1).length) { pages.push([]); used = 0; }
+            pages.at(-1).push(tr);
+            used += tr.offsetHeight;
+        });
+        const fontEmbedCSS = await rcPdfFontCss();
+        const pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        for (const [n, page] of pages.entries()) {
+            const body = table.tBodies[0];
+            [...body.rows].forEach(tr => { tr.hidden = !page.includes(tr); });
+            const img = await htmlToImage.toJpeg(table, { pixelRatio: 2, quality: 0.92, backgroundColor: '#fff', fontEmbedCSS });
+            const fullW = RC_PDF.w - RC_PDF.margin * 2, fullH = RC_PDF.h - RC_PDF.margin * 2;
+            const scale = Math.min(fullW / (table.offsetWidth / RC_PDF.px), fullH / (table.offsetHeight / RC_PDF.px));
+            if (n) pdf.addPage();
+            pdf.addImage(img, 'JPEG', RC_PDF.margin, RC_PDF.margin, table.offsetWidth / RC_PDF.px * scale, table.offsetHeight / RC_PDF.px * scale);
+        }
+        pdf.save(rcSheetTitle(types) + '.pdf');
+    } catch (error) {
+        showToast(`PDF를 만들지 못했어요. ${error.message}`, 'error');
+    } finally {
+        box.remove();
+        rcLoading(null);
+    }
+}
+
+// 내려받기·인쇄하기 전에 결과가 있는 점검 영역만 골라 보여 줌 (처음엔 모두 고름)
+let rcPickMode = 'pdf';
+function rcAskPick(mode) {
     if (!rcResults) return;
     const types = Object.keys(RC_TYPES).filter(t => rcCount(t));
-    if (!types.length) { showModal('알림', '인쇄할 점검 결과가 없어요.', 'info'); return; }
+    const verb = mode === 'print' ? '인쇄' : '내려받기';
+    if (!types.length) { showModal('알림', `${verb}할 점검 결과가 없어요.`, 'info'); return; }
+    rcPickMode = mode;
+    document.getElementById('rc-print-title').textContent = mode === 'print' ? '어떤 점검 결과를 인쇄할까요?' : '어떤 점검 결과를 내려받을까요?';
+    document.getElementById('rc-print-desc').textContent = mode === 'print' ? '결과가 있는 영역만 보여요. A4 가로로 인쇄돼요.' : '결과가 있는 영역만 보여요. A4 가로 PDF 파일로 저장돼요.';
+    document.getElementById('rc-print-go').textContent = mode === 'print' ? '인쇄하기' : '내려받기';
     document.getElementById('rc-print-list').innerHTML = `<label class="rc-print-all"><input type="checkbox" checked onchange="rcPrintPickAll(this.checked)"><span>전체</span><em>${rcCount('all')}명</em></label>`
         + types.map(t => `<label><input type="checkbox" name="rc-print-type" value="${t}" checked onchange="rcPrintSync()"><span>${RC_TYPES[t]}</span><em>${rcCount(t)}명</em></label>`).join('');
     rcPrintSync();
@@ -404,10 +479,11 @@ function rcPrintSync() {
     all.indeterminate = n > 0 && n < boxes.length;
     document.getElementById('rc-print-go').disabled = !n;
 }
-function rcConfirmPrint() {
+function rcConfirmPick() {
     const types = rcPrintPicked();
     document.getElementById('rc-print-dialog').close();
-    if (types.length) rcExport(types);
+    if (!types.length) return;
+    if (rcPickMode === 'print') rcPrint(types); else rcDownloadPdf(types);
 }
 
 // 끌어다 놓기
