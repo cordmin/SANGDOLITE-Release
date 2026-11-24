@@ -10,7 +10,7 @@ async function loadDictionary() {
         return response.text();
     }));
     const dictionary = await createHunspellFromStrings(aff, dic);
-    dictionary.nouns = new Set(nouns.split('\n'));
+    dictionary.nouns = new Set(nouns.split(/\r?\n/)); // 윈도에서 받으면 줄 끝이 \r\n일 수 있음
     return dictionary;
 }
 
