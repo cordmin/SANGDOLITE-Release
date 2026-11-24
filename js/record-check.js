@@ -518,8 +518,8 @@ function rcPdfBody(lines) {
 // PDF 줄바꿈 자리 띄어쓰기: 붙인 말이 사전에 있으면 붙이고(설+명하는), 두 조각이 각각 사전에 있으면 띄우고(생각과 기억이),
 // 둘 다 아니거나 사전이 없으면 끝말 짐작(rcWrapSpace)대로. known: 사전에 그대로 있는 낱말 모음(Set) 또는 null
 const RC_WRAP_SP = '\u2063', RC_WRAP_NO = '\u2064';
-// 사전에 없는 합성어 꼬리: 다음 줄 첫머리가 '관을·기의·별·적인'처럼 뒤에 붙는 말(+조사)뿐이면 붙임 (인성+관을)
-const RC_WRAP_SUFFIX = /^(?:관|기|별|적|력|성|화|감|법|형|권|률|율|론|점)(?:을|를|이|가|은|는|의|에|과|와|로|으로|인|도|만|에서)?$/;
+// 사전에 없는 합성어 꼬리: 다음 줄 첫머리가 '관을·기의·별·적인·지에(활동지에)'처럼 뒤에 붙는 말(+조사)뿐이면 붙임 (인성+관을)
+const RC_WRAP_SUFFIX = /^(?:관|기|별|적|력|성|화|감|법|형|권|률|율|론|점|지)(?:을|를|이|가|은|는|의|에|과|와|로|으로|인|도|만|에서)?$/;
 const RC_WRAP_PAIR = /([가-힣A-Za-z0-9]+)([\u2063\u2064])([가-힣A-Za-z0-9]+)/g;
 function rcWrapWords(records) {
     const words = new Set();
@@ -527,13 +527,25 @@ function rcWrapWords(records) {
     return [...words];
 }
 // 나이스는 글자 단위로 줄을 바꿔 '활|동지에', '현|실감'처럼 한 글자가 줄 끝에 남음. 한 글자는 혼자 쓰는 말일 때만 낱말로 봄
-const RC_WRAP_ONE = '및더수것등각첫두세네그저잘못또꼭늘곧좀새온큰후중전때속시내한할반힘컷열';
+const RC_WRAP_ONE = '및더수것등각첫두세네그저잘못또꼭늘곧좀새온큰후중전때속시내한할반힘컷열데곡';
+// 앞 줄이 '중학생이·역할을·바탕으로'처럼 조사로 끝난 낱말이면, 다음 줄 '된·한·함'은 붙이지 않고 띄움 (중학생이 된)
+const RC_WRAP_AFTER_JOSA = /^.{2,}(?:으로|을|를|은|는|이|가|에|의|와|과|로|야|서)$/;
+function rcWrapSpaced(a, b, mark, known) {
+    if (!known) return mark === RC_WRAP_SP;
+    const word = w => (w.length > 1 ? known.has(w) : RC_WRAP_ONE.includes(w));
+    if (/^(?:된|되|한|할|함|하)/.test(b) && RC_WRAP_AFTER_JOSA.test(a) && known.has(a)) return true;
+    if (known.has(a + b) || RC_NEXT_JOSA.test(b) || RC_WRAP_SUFFIX.test(b)) return false;
+    if (/^(?:등|및)$/.test(b)) return true; // '킥|등': 붙인 말이 사전에 없으면 '등·및'은 띄움 ('평|등'은 위에서 붙임)
+    if (word(a) && word(b)) return true;
+    // '활용한|얼티미트'처럼 앞이 꾸미는 꼴(~한·~른·~운)로 끝난 낱말이고 뒤가 사전에 없는 말(외래어 등)이면 띄움
+    if (/[한른운린된]$/.test(a) && word(a)) return true;
+    return mark === RC_WRAP_SP;
+}
 function rcResolveWraps(records, known) {
-    const word = w => known.has(w) && (w.length > 1 || RC_WRAP_ONE.includes(w));
     return records.map(rec => ({
         ...rec,
         text: rec.text.replace(RC_WRAP_PAIR, (m, a, mark, b) => {
-            const sp = known && (known.has(a + b) || RC_NEXT_JOSA.test(b) || RC_WRAP_SUFFIX.test(b)) ? false : known && word(a) && word(b) ? true : mark === RC_WRAP_SP;
+            const sp = rcWrapSpaced(a, b, mark, known);
             return a + (sp ? ' ' : '') + b;
         }).replace(/[\u2063\u2064]/g, m => (m === RC_WRAP_SP ? ' ' : ''))
     }));

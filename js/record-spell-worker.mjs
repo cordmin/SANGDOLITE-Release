@@ -58,21 +58,23 @@ function rcKnownMore(dictionary, word) {
     return false;
 }
 
-function rcKnownExtra(dictionary, word) {
+// split: 아는 말 두 개로 나눠 보기까지 함. PDF 줄바꿈 판단에서는 '생각과기억이'를 한 낱말로 보면 안 돼서 나누지 않음
+function rcKnownExtra(dictionary, word, split = true) {
     const { nouns } = dictionary;
     const stemIs = (ends, test) => ends.some(e => word.endsWith(e) && word.length - e.length >= 2 && test(word.slice(0, -e.length)));
     if (nouns.has(word) || stemIs(RC_JOSA, s => nouns.has(s))) return true;
-    if (stemIs(RC_HADA, s => nouns.has(s) || dictionary.testSpelling(s))) return true;
+    // '바탕으로한'·'간단히하고자'는 띄어 써야 해서, 조사·'히'로 끝난 앞말에는 '함·하는'을 붙여 보지 않음
+    if (stemIs(RC_HADA, s => !/(?:으로|을|를|히|에서|에게)$/.test(s) && (nouns.has(s) || dictionary.testSpelling(s)))) return true;
     if (word.length >= 3 && word.endsWith('진') && dictionary.testSpelling(word.slice(0, -1) + '지다')) return true;
-    return rcKnownMore(dictionary, word);
+    return split && rcKnownMore(dictionary, word);
 }
 
 self.onmessage = async ({ data: { id, words, exact } }) => {
     try {
         ready ||= loadDictionary().catch(error => { ready = null; throw error; });
         const dictionary = await ready;
-        // exact: 나누지 않고 사전에 그대로 있는 낱말만 돌려줌 (PDF 줄바꿈 띄어쓰기 판단용)
-        if (exact) return self.postMessage({ id, known: words.filter(word => dictionary.testSpelling(word)) });
+        // exact: 나누지 않고 사전·명사 목록에 그대로 있는 낱말만 돌려줌 (PDF 줄바꿈 띄어쓰기 판단용. '가창함'·'조형'은 알고, '생각과기억이'는 모름)
+        if (exact) return self.postMessage({ id, known: words.filter(word => dictionary.testSpelling(word) || rcKnownExtra(dictionary, word, false)) });
         const spellings = {};
         for (const word of words) {
             if (!cache.has(word)) {
