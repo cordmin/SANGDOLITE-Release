@@ -871,10 +871,25 @@ function rcCheckAll(records, settings, byteLen) {
             for (const passage of matches) { note(i, passage, b.rec); note(j, passage, a.rec); }
         }
         // 같은 문장이 여러 학생에게 있으면 '○○ 외 n명'으로 한 번만 알려 줌
-        same.forEach((map, k) => map.forEach((others, passage) => list[k].issues.push({ type: 'similar', level: 'check', what: passage,
+        same.forEach((map, k) => map.forEach((others, passage) => list[k].issues.push({ type: 'similar', level: 'check', what: passage, others,
             why: `${rcWho(others[0])}${others.length > 1 ? ` 외 ${others.length - 1}명` : ''} 기록에 100% 동일한 문장 또는 문단이 있어요.` })));
     }
     return results;
+}
+
+// 화면·엑셀용: 똑같은 문장 안내를 학생당 한 줄로 합침. people: 겹치는 학생마다 같은 문장들 (이름에 커서를 올리면 그 문장만 강조)
+function rcMergeSimilar(issues) {
+    const dup = issues.filter(i => i.type === 'similar');
+    if (!dup.length) return issues;
+    const people = new Map();
+    for (const i of dup) for (const rec of i.others || []) {
+        const who = rcWho(rec);
+        if (!people.has(who)) people.set(who, { who, rec, passages: [] });
+        people.get(who).passages.push(i.what);
+    }
+    const list = [...people.values()];
+    return [...issues.filter(i => i.type !== 'similar'), { type: 'similar', level: 'check', what: '', people: list,
+        why: `다른 학생 기록에도 동일한 문장이 있어요. (${list.map(p => p.who).join(', ')})` }];
 }
 
 // 사전이 모르는 낱말: 문구·개수 없이 화면에 밑줄만 그음 (이미 고칠 점으로 잡힌 말은 빼고)
@@ -908,4 +923,4 @@ function rcHighlight(text, issues, dict = []) {
     return html.replace(re, m => `<mark class="rc-mark rc-${levelOf(raw.get(m))}">${m}</mark>`).replace(/\n/g, '<br>');
 }
 
-if (typeof module !== 'undefined') module.exports = { RC_DEFAULT_SETTINGS, RC_DEFAULT_GUIDE, rcApplyGuide, rcPattern, RC_TYPES, rcParseRows, rcParsePdfLines, rcGroupLines, rcPdfRects, rcPdfTable, rcWrapWords, rcResolveWraps, rcCheckOne, rcCheckAll, rcHighlight, rcGuessArea };
+if (typeof module !== 'undefined') module.exports = { RC_DEFAULT_SETTINGS, RC_DEFAULT_GUIDE, rcApplyGuide, rcPattern, RC_TYPES, rcParseRows, rcParsePdfLines, rcGroupLines, rcPdfRects, rcPdfTable, rcWrapWords, rcResolveWraps, rcCheckOne, rcCheckAll, rcMergeSimilar, rcHighlight, rcGuessArea };

@@ -306,12 +306,28 @@ function rcRenderResults() {
     }
     tbody.innerHTML = rows.map(r => {
         const where = rcWhereLines(r.rec).map(line => `<span>${rcEscape(line)}</span>`).join('');
-        const fixes = r.shown.map(x => `<li class="rc-${x.level}"><span class="rc-tag">${RC_TYPES[x.type]}</span>${rcEscape(x.why)}</li>`).join('');
+        const fixes = rcMergeSimilar(r.shown).map(x => `<li class="rc-${x.level}"><span class="rc-tag">${RC_TYPES[x.type]}</span>${x.people
+            ? `다른 학생 기록에도 동일한 문장이 있어요.<span class="rc-dup-list">${x.people.map(p =>
+                `<span class="rc-dup-name" tabindex="0" aria-label="${rcEscape(p.who)}과(와) 같은 문장 ${p.passages.length}개" data-passages="${rcEscape(JSON.stringify(p.passages))}">${rcEscape(rcStudentId(p.rec))} ${rcEscape(p.rec.name)}</span>`).join('')}</span>`
+            : rcEscape(x.why)}</li>`).join('');
         return `<tr><td class="rc-who"><b>${rcEscape(r.rec.name)}</b></td><td class="rc-id">${rcEscape(rcStudentId(r.rec))}</td><td class="rc-where">${where}</td>`
             + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown, r.dict) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
             + `<td class="rc-fix"><ul>${fixes}</ul></td><td class="excel-byte">${getByteLength(r.rec.text)} Byte</td></tr>`;
     }).join('') + RC_FILLER;
 }
+
+// 똑같은 문장: 학생 이름에 커서를 올리거나 Tab으로 고르면, 그 학생과 같은 문장만 진하게 남기고 다른 똑같은 문장 표시는 잠깐 끔
+function rcDupFocus(name, on) {
+    const row = name.closest('tr');
+    const mine = new Set(on ? JSON.parse(name.dataset.passages) : []);
+    const all = new Set(on ? [...row.querySelectorAll('.rc-dup-name')].flatMap(n => JSON.parse(n.dataset.passages)) : []);
+    row.querySelectorAll('.rc-text .rc-mark').forEach(mark => {
+        mark.classList.toggle('rc-dup-on', mine.has(mark.textContent));
+        mark.classList.toggle('rc-dup-off', all.has(mark.textContent) && !mine.has(mark.textContent));
+    });
+}
+['mouseover', 'focusin'].forEach(ev => document.getElementById('rc-tbody').addEventListener(ev, e => { const n = e.target.closest('.rc-dup-name'); if (n) rcDupFocus(n, true); }));
+['mouseout', 'focusout'].forEach(ev => document.getElementById('rc-tbody').addEventListener(ev, e => { const n = e.target.closest('.rc-dup-name'); if (n) rcDupFocus(n, false); }));
 
 function rcSearch(v) {
     rcQuery = v;
@@ -326,7 +342,7 @@ function rcExport() {
     const head = ['이름', '학번', '항목', '기록 내용', '점검 결과', '글자 수'];
     const ws = XLSX.utils.aoa_to_sheet([head, ...rows.map(r => [
         r.rec.name, rcStudentId(r.rec), rcWhereLines(r.rec).join('\n'), r.rec.text || '(비어 있음)',
-        r.shown.map(x => `[${RC_TYPES[x.type]}] ${x.why}`).join('\n'), `${getByteLength(r.rec.text)} Byte`
+        rcMergeSimilar(r.shown).map(x => `[${RC_TYPES[x.type]}] ${x.why}`).join('\n'), `${getByteLength(r.rec.text)} Byte`
     ])]);
     ws['!cols'] = [10, 9, 22, 70, 60, 11].map(wch => ({ wch }));
     const line = { style: 'thin', color: { rgb: '94A3B8' } };
