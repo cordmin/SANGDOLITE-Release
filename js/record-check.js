@@ -878,9 +878,14 @@ function rcCheckAll(records, settings, byteLen) {
 }
 
 // 사전이 모르는 낱말: 문구·개수 없이 화면에 밑줄만 그음 (이미 고칠 점으로 잡힌 말은 빼고)
+// 활동명은 일부러 붙여 쓰기도 해서 밑줄을 긋지 않음: '생명존중및자살예방교육(2026.08.12.)'처럼 바로 뒤에 날짜가 붙은 낱말,
+// 나이스가 붙이는 동아리 머리말 '(힐링컬러링반)(18시간)', '(… : 방과후학교스포츠클럽)(1시간)', 줄 맨 앞 '(노래가사감상반)' 속 낱말
 function rcDictMarks(text, spellings, issues) {
     if (!spellings) return [];
-    return rcSpellWords(text).filter(word => spellings[word]
+    const nfc = text.normalize('NFC');
+    const activities = new Set([...nfc.matchAll(/([\p{L}\p{N}]+)\(\s*\d{4}\s*\./gu)].map(m => m[1])
+        .concat((nfc.match(RC_AUTO_HEAD) || []).flatMap(rcSpellWords), (nfc.match(/^[ \t]*\([^()\n]{1,40}\)/gm) || []).flatMap(rcSpellWords)));
+    return rcSpellWords(text).filter(word => spellings[word] && !activities.has(word)
         && !issues.some(issue => (issue.type === 'spell' || issue.type === 'forbid') && issue.what.trim() && (word.includes(issue.what.trim()) || issue.what.includes(word))));
 }
 
