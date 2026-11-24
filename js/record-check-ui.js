@@ -259,11 +259,12 @@ const RC_FILLER = '<tr class="filler-row" style="height:100%"><td></td><td></td>
 function rcHasMarks(r, tab) {
     return ((tab === 'all' || tab === 'spell') && (r.marks || []).length > 0) || ((tab === 'all' || tab === 'loan') && (r.loanMarks || []).length > 0);
 }
-function rcVisibleRows(withMarks = false) {
+// types: 보여 줄 점검 영역 목록 (null이면 전체). 기본은 지금 고른 필터, 인쇄 창에서는 고른 영역들
+function rcVisibleRows(withMarks = false, types = rcTab === 'all' ? null : [rcTab]) {
     const q = rcQuery.trim();
-    const on = tab => withMarks && (rcTab === 'all' || rcTab === tab);
+    const has = t => !types || types.includes(t);
     return (rcResults || [])
-        .map(r => ({ ...r, shown: r.issues.filter(i => rcTab === 'all' || i.type === rcTab), dict: on('spell') ? r.marks || [] : [], loan: on('loan') ? r.loanMarks || [] : [] }))
+        .map(r => ({ ...r, shown: r.issues.filter(i => has(i.type)), dict: withMarks && has('spell') ? r.marks || [] : [], loan: withMarks && has('loan') ? r.loanMarks || [] : [] }))
         .filter(r => (r.shown.length || r.dict.length || r.loan.length) && (!q || rcWho(r.rec).includes(q) || r.rec.subject.includes(q) || r.rec.area.includes(q)));
 }
 
@@ -287,12 +288,12 @@ function rcRenderResults() {
     const filter = document.getElementById('rc-type-filter');
     filter.innerHTML = '<button type="button"><selectedcontent></selectedcontent></button>' + tabs.map(([t, label]) => {
         // 표에 나올 학생 수 (검색어와 상관없이)
-        const n = (rcResults || []).filter(r => r.issues.some(issue => t === 'all' || issue.type === t) || rcHasMarks(r, t)).length;
+        const n = rcCount(t);
         const count = rcResults ? ` <span class="rc-filter-count${n ? '' : ' rc-zero'}" aria-label="${n}명">${n}</span>` : '';
         return `<option value="${t}"><span class="rc-filter-label">${label}</span>${count}</option>`;
     }).join('');
     filter.value = rcTab;
-    document.getElementById('rc-export-btn').disabled = !rcResults;
+    ['rc-export-btn', 'rc-print-btn'].forEach(id => { document.getElementById(id).disabled = !rcResults; });
     document.getElementById('rc-import').hidden = !!(rcResults || rcFiles.length);
 
     if (!rcResults) {
@@ -307,7 +308,16 @@ function rcRenderResults() {
         tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty"><span class="rc-empty-msg">${q ? '찾는 학생이 없어요.' : '충성! 보조 점검 결과 이상 없습니다!'}</span></td></tr>`;
         return;
     }
-    tbody.innerHTML = rows.map(r => {
+    tbody.innerHTML = rows.map(rcRowHtml).join('') + RC_FILLER;
+}
+
+// 점검 영역(t)에 걸린 학생 수 (검색어와 상관없이)
+function rcCount(t) {
+    return (rcResults || []).filter(r => r.issues.some(issue => t === 'all' || issue.type === t) || rcHasMarks(r, t)).length;
+}
+
+// 결과 표 한 줄 (화면과 인쇄가 같이 씀)
+function rcRowHtml(r) {
         const where = rcWhereLines(r.rec).map(line => `<span>${rcEscape(line)}</span>`).join('');
         const fixes = rcMergeSimilar(r.shown).map(x => `<li class="rc-${x.level}"><span class="rc-tag">${RC_TYPES[x.type]}</span>${x.people
             ? `다른 학생 기록에도 동일한 문장이 있어요.<span class="rc-dup-list">${x.people.map(p =>
@@ -316,7 +326,6 @@ function rcRenderResults() {
         return `<tr><td class="rc-who"><b>${rcEscape(r.rec.name)}</b></td><td class="rc-id">${rcEscape(rcStudentId(r.rec))}</td><td class="rc-where">${where}</td>`
             + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown, r.dict, r.loan) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
             + `<td class="rc-fix"><ul>${fixes}</ul></td><td class="excel-byte">${getByteLength(r.rec.text)} Byte</td></tr>`;
-    }).join('') + RC_FILLER;
 }
 
 // 똑같은 문장: 학생 이름에 커서를 올리거나 Tab으로 고르면, 그 학생과 같은 문장만 진하게 남기고 다른 똑같은 문장 표시는 잠깐 끔
@@ -337,40 +346,68 @@ function rcSearch(v) {
     rcRenderResults();
 }
 
-// 결과 내려받기: 지금 화면에 보이는 표(필터·검색 그대로)를 같은 칸·색으로 엑셀에 담음
-function rcExport() {
+// 결과 내려받기(PDF)·인쇄하기: 고른 점검 영역(types, 없으면 지금 필터 그대로)의 표를 화면과 같은 모양으로 숨은 틀에 옮겨 인쇄창을 띄움 → 'PDF로 저장' 또는 프린터
+// ponytail: 브라우저 인쇄 기능을 씀. 사용자가 인쇄창에서 'PDF로 저장'을 골라야 함 (바로 파일로 떨어뜨리려면 PDF 라이브러리가 필요)
+function rcExport(types) {
     if (!rcResults) return;
-    const rows = rcVisibleRows();
+    const rows = types ? rcVisibleRows(true, types) : rcVisibleRows(true);
     if (!rows.length) { showModal('알림', '지금 화면에 내려받을 내용이 없어요.', 'info'); return; }
-    const head = ['이름', '학번', '항목', '기록 내용', '점검 결과', '글자 수'];
-    const ws = XLSX.utils.aoa_to_sheet([head, ...rows.map(r => [
-        r.rec.name, rcStudentId(r.rec), rcWhereLines(r.rec).join('\n'), r.rec.text || '(비어 있음)',
-        rcMergeSimilar(r.shown).map(x => `[${RC_TYPES[x.type]}] ${x.why}`).join('\n'), `${getByteLength(r.rec.text)} Byte`
-    ])]);
-    ws['!cols'] = [10, 9, 22, 70, 60, 11].map(wch => ({ wch }));
-    const line = { style: 'thin', color: { rgb: '94A3B8' } };
-    const border = { top: line, bottom: line, left: line, right: line };
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    for (let R = range.s.r; R <= range.e.r; R++) {
-        const r = rows[R - 1];
-        const strict = r && r.shown.some(x => x.level === 'no'); // 기재 불가가 있으면 빨강, 확인만 필요하면 노랑 (화면 줄 색과 같음)
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            const c = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-            if (!c) continue;
-            c.s = { border, alignment: { vertical: 'center', horizontal: C === 3 || C === 4 ? 'left' : 'center', wrapText: true }, font: { sz: 11, color: { rgb: '334155' } } };
-            if (R === 0) { c.s.fill = { fgColor: { rgb: 'F1F5F9' } }; c.s.font = { bold: true, sz: 11, color: { rgb: '334155' } }; continue; }
-            if (C === 0) c.s.font = { bold: true, sz: 11, color: { rgb: '1E293B' } };
-            if (C === 1) c.s.font = { sz: 11, color: { rgb: '475569' } };
-            if (C === 3 && !r.rec.text) c.s.font = { italic: true, sz: 11, color: { rgb: '94A3B8' } };
-            if (C === 4) { c.s.fill = { fgColor: { rgb: strict ? 'FEF2F2' : 'FFFBEB' } }; c.s.font = { sz: 10.5, color: { rgb: strict ? '991B1B' : '92400E' } }; }
-            if (C === 5) { c.s.fill = { fgColor: { rgb: 'F8FAFC' } }; c.s.font = { bold: true, sz: 11, color: { rgb: r.shown.some(x => x.type === 'length') ? 'B91C1C' : '475569' } }; }
-        }
-    }
-    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-    ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '점검 결과');
-    XLSX.writeFile(wb, rcTab === 'all' ? '생기부_점검결과.xlsx' : `생기부_점검결과_${RC_TYPES[rcTab]}.xlsx`);
+    const screen = document.querySelector('#check-result .rc-table');
+    const table = `<table class="excel-table rc-table">${screen.querySelector('colgroup').outerHTML}${screen.querySelector('thead').outerHTML}<tbody>${rows.map(rcRowHtml).join('')}</tbody></table>`;
+    const picked = types ? (types.length === Object.keys(RC_TYPES).filter(t => rcCount(t)).length ? [] : types) : rcTab === 'all' ? [] : [rcTab];
+    const title = ['생기부_점검결과', ...picked.map(t => RC_TYPES[t])].join('_');
+    const css = [...document.querySelectorAll('link[rel="stylesheet"]')].map(l => `<link rel="stylesheet" href="${l.href}">`).join('');
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${rcEscape(title)}</title>${css}<style>
+        @page { size: A4 landscape; margin: 10mm; }
+        body { margin: 0; font-family: Pretendard, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .rc-table { table-layout: fixed; width: 100%; border: 1px solid #334155; }
+        .rc-table th { position: static; }
+        .rc-table tr { break-inside: avoid; }
+        .rc-table tr:last-child td { border-bottom: 1px solid #94a3b8; }
+        .rc-fix ul { list-style: none; margin: 0; padding: 0; }
+        .rc-dup-name { cursor: default; }
+    </style></head><body>${table}</body></html>`);
+    doc.close();
+    frame.contentWindow.onafterprint = () => setTimeout(() => frame.remove());
+    // 글꼴·스타일을 다 받은 뒤 인쇄 (안 그러면 밑줄·색 없이 찍힐 수 있음)
+    const print = () => frame.contentWindow.print();
+    frame.contentWindow.addEventListener('load', () => (doc.fonts ? doc.fonts.ready : Promise.resolve()).then(print), { once: true });
+}
+
+// 인쇄하기: 결과가 있는 점검 영역만 골라서 인쇄 (처음엔 모두 고름)
+function rcAskPrint() {
+    if (!rcResults) return;
+    const types = Object.keys(RC_TYPES).filter(t => rcCount(t));
+    if (!types.length) { showModal('알림', '인쇄할 점검 결과가 없어요.', 'info'); return; }
+    document.getElementById('rc-print-list').innerHTML = `<label class="rc-print-all"><input type="checkbox" checked onchange="rcPrintPickAll(this.checked)"><span>전체</span><em>${rcCount('all')}명</em></label>`
+        + types.map(t => `<label><input type="checkbox" name="rc-print-type" value="${t}" checked onchange="rcPrintSync()"><span>${RC_TYPES[t]}</span><em>${rcCount(t)}명</em></label>`).join('');
+    rcPrintSync();
+    document.getElementById('rc-print-dialog').showModal();
+}
+function rcPrintPicked() {
+    return [...document.querySelectorAll('#rc-print-list input[name="rc-print-type"]:checked')].map(i => i.value);
+}
+function rcPrintPickAll(on) {
+    document.querySelectorAll('#rc-print-list input[name="rc-print-type"]').forEach(i => { i.checked = on; });
+    rcPrintSync();
+}
+function rcPrintSync() {
+    const boxes = document.querySelectorAll('#rc-print-list input[name="rc-print-type"]');
+    const n = rcPrintPicked().length;
+    const all = document.querySelector('#rc-print-list .rc-print-all input');
+    all.checked = n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+    document.getElementById('rc-print-go').disabled = !n;
+}
+function rcConfirmPrint() {
+    const types = rcPrintPicked();
+    document.getElementById('rc-print-dialog').close();
+    if (types.length) rcExport(types);
 }
 
 // 끌어다 놓기
