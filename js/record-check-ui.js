@@ -255,11 +255,13 @@ async function rcRun(barFrom = 0) {
 const RC_FILLER = '<tr class="filler-row" style="height:100%"><td></td><td></td><td></td><td></td><td></td><td class="excel-byte"></td></tr>';
 
 // 지금 화면에 보이는 줄 (필터·검색 반영). 화면과 '결과 내려받기'가 같이 씀
-function rcVisibleRows() {
+// withMarks: 화면에서는 사전 밑줄만 있는 학생도 보여 줌 (전체·맞춤법 보기에서만, 학생 수에는 안 셈). 엑셀에는 안 담음
+function rcVisibleRows(withMarks = false) {
     const q = rcQuery.trim();
+    const marksOn = withMarks && (rcTab === 'all' || rcTab === 'spell');
     return (rcResults || [])
-        .map(r => ({ ...r, shown: r.issues.filter(i => rcTab === 'all' || i.type === rcTab) }))
-        .filter(r => r.shown.length && (!q || rcWho(r.rec).includes(q) || r.rec.subject.includes(q) || r.rec.area.includes(q)));
+        .map(r => ({ ...r, shown: r.issues.filter(i => rcTab === 'all' || i.type === rcTab), dict: marksOn ? r.marks || [] : [] }))
+        .filter(r => (r.shown.length || r.dict.length) && (!q || rcWho(r.rec).includes(q) || r.rec.subject.includes(q) || r.rec.area.includes(q)));
 }
 
 // 학번: 1학년 3반 1번 → 10301 (숫자가 모자라면 있는 것만 이어 씀)
@@ -297,7 +299,7 @@ function rcRenderResults() {
     }
 
     const q = rcQuery.trim();
-    const rows = rcVisibleRows();
+    const rows = rcVisibleRows(true);
     if (!rows.length) {
         tbody.innerHTML = `<tr class="filler-row" style="height:100%"><td colspan="6" class="rc-empty"><span class="rc-empty-msg">${q ? '찾는 학생이 없어요.' : '충성! 보조 점검 결과 이상 없습니다!'}</span></td></tr>`;
         return;
@@ -306,7 +308,7 @@ function rcRenderResults() {
         const where = rcWhereLines(r.rec).map(line => `<span>${rcEscape(line)}</span>`).join('');
         const fixes = r.shown.map(x => `<li class="rc-${x.level}"><span class="rc-tag">${RC_TYPES[x.type]}</span>${rcEscape(x.why)}</li>`).join('');
         return `<tr><td class="rc-who"><b>${rcEscape(r.rec.name)}</b></td><td class="rc-id">${rcEscape(rcStudentId(r.rec))}</td><td class="rc-where">${where}</td>`
-            + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
+            + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown, r.dict) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
             + `<td class="rc-fix"><ul>${fixes}</ul></td><td class="excel-byte">${getByteLength(r.rec.text)} Byte</td></tr>`;
     }).join('') + RC_FILLER;
 }

@@ -833,7 +833,10 @@ function rcExactPassages(text) {
 
 function rcCheckAll(records, settings, byteLen) {
     const off = new Set(settings.off || []);
-    const results = records.map(rec => ({ rec, issues: rcCheckOne(rec, settings, byteLen).filter(i => !off.has(i.type)) }));
+    const results = records.map(rec => {
+        const issues = rcCheckOne(rec, settings, byteLen).filter(i => !off.has(i.type));
+        return { rec, issues, marks: off.has('spell') ? [] : rcDictMarks(rec.text, settings.spellings, issues) };
+    });
     if (off.has('similar')) return results;
     // 같은 영역·과목의 다른 학생끼리 비교. ponytail: 수천 명이면 문장 색인으로 바꿀 것
     const groups = new Map();
@@ -858,18 +861,29 @@ function rcCheckAll(records, settings, byteLen) {
     return results;
 }
 
+// 사전이 모르는 낱말: 문구·개수 없이 화면에 밑줄만 그음 (이미 고칠 점으로 잡힌 말은 빼고)
+function rcDictMarks(text, spellings, issues) {
+    if (!spellings) return [];
+    return rcSpellWords(text).filter(word => spellings[word]
+        && !issues.some(issue => (issue.type === 'spell' || issue.type === 'forbid') && issue.what.trim() && (word.includes(issue.what.trim()) || issue.what.includes(word))));
+}
+
 function rcWho(rec) {
     const where = [rec.grade && rec.grade + '학년', rec.cls && rec.cls + '반', rec.num && rec.num + '번'].filter(Boolean).join(' ');
     return (where ? where + ' ' : '') + rec.name;
 }
 
-// 기록 글에 문제 부분을 표시한 HTML
-function rcHighlight(text, issues) {
-    const marks = [...new Set(issues.map(i => i.what).filter(w => w && w.trim()))].sort((a, b) => b.length - a.length);
+// 기록 글에 문제 부분을 표시한 HTML. dict: 사전이 모르는 낱말(밑줄만, '과학고등학교' 속 '학고'처럼 낱말 중간에는 안 그음)
+function rcHighlight(text, issues, dict = []) {
+    const words = [...new Set(issues.map(i => i.what).filter(w => w && w.trim()))];
+    const marks = [...words, ...dict.filter(w => !words.includes(w))].sort((a, b) => b.length - a.length);
     let html = rcEscape(text);
     if (!marks.length) return html.replace(/\n/g, '<br>');
-    const levelOf = w => (issues.some(i => i.what === w && i.level === 'no') ? 'no' : 'check');
-    const re = new RegExp(marks.map(w => rcEscape(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+    const levelOf = w => (!words.includes(w) ? 'dict' : issues.some(i => i.what === w && i.level === 'no') ? 'no' : 'check');
+    const re = new RegExp(marks.map(w => {
+        const plain = rcEscape(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return words.includes(w) ? plain : `(?<![가-힣])${plain}(?=님|[^가-힣]|$)`;
+    }).join('|'), 'g');
     const raw = new Map(marks.map(w => [rcEscape(w), w]));
     return html.replace(re, m => `<mark class="rc-mark rc-${levelOf(raw.get(m))}">${m}</mark>`).replace(/\n/g, '<br>');
 }

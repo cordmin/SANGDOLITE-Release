@@ -245,6 +245,8 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-mark { border-radius: 3px; padding: 0 1px; }
 .rc-mark.rc-no { background: #fecaca; color: #7f1d1d; }
 .rc-mark.rc-check { background: #fde68a; color: #78350f; }
+/* 사전이 모르는 낱말: 배경 없이 빨간 물결 밑줄만 */
+.rc-mark.rc-dict { background: none; color: inherit; text-decoration: underline wavy #dc2626; text-decoration-skip-ink: none; text-underline-offset: 3px; }
 .rc-fix ul { display: flex; flex-direction: column; gap: 6px; }
 .rc-fix li { font-size: 13px; line-height: 1.55; color: #334155; }
 .rc-fix li.rc-no .rc-tag { background: #fee2e2; color: #b91c1c; }
