@@ -4,12 +4,14 @@ let ready;
 const cache = new Map();
 
 async function loadDictionary() {
-    const files = await Promise.all(['ko.aff', 'ko.dic'].map(async name => {
-        const response = await fetch(new URL(`../assets/hunspell-ko/${name}`, import.meta.url));
+    const [aff, dic, nouns] = await Promise.all(['hunspell-ko/ko.aff', 'hunspell-ko/ko.dic', 'nikl-nouns/nouns.txt'].map(async name => {
+        const response = await fetch(new URL(`../assets/${name}`, import.meta.url));
         if (!response.ok) throw new Error('한국어 맞춤법 사전을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
         return response.text();
     }));
-    return createHunspellFromStrings(...files);
+    const dictionary = await createHunspellFromStrings(aff, dic);
+    dictionary.nouns = new Set(nouns.split('\n'));
+    return dictionary;
 }
 
 // 사전은 '과학탐구반', '분리배출'처럼 붙여 쓴 낱말을 잘 몰라서, 아는 말 2~3개로 나뉘면 맞는 말로 봄.
@@ -25,6 +27,15 @@ function rcKnown(dictionary, word, depth = 0) {
     return false;
 }
 
+// 사전이 모르는 '마찰력을'·'정해진' 보완: 조사를 떼고 국립국어원 명사 목록(assets/nikl-nouns)에서 찾거나, '~진'을 '~지다'로 바꿔 확인
+const RC_JOSA = ['에서는', '으로는', '에서', '으로', '에게', '까지', '부터', '처럼', '보다', '만큼', '이나', '이라', '과의', '와의',
+    '을', '를', '이', '가', '은', '는', '에', '의', '과', '와', '로', '도', '만', '나'];
+function rcKnownExtra(dictionary, word) {
+    const { nouns } = dictionary;
+    if (nouns.has(word) || RC_JOSA.some(j => word.endsWith(j) && word.length - j.length >= 2 && nouns.has(word.slice(0, -j.length)))) return true;
+    return word.length >= 3 && word.endsWith('진') && dictionary.testSpelling(word.slice(0, -1) + '지다');
+}
+
 self.onmessage = async ({ data: { id, words, exact } }) => {
     try {
         ready ||= loadDictionary().catch(error => { ready = null; throw error; });
@@ -35,7 +46,7 @@ self.onmessage = async ({ data: { id, words, exact } }) => {
         for (const word of words) {
             if (!cache.has(word)) {
                 // 사전이 모르는 전문어·이름도 있을 수 있어, 오류 확정 대신 확인 대상으로 안내함.
-                const suggestions = rcKnown(dictionary, word) ? null
+                const suggestions = rcKnown(dictionary, word) || rcKnownExtra(dictionary, word) ? null
                     : [...new Set(dictionary.getSpellingSuggestions(word).map(s => s.normalize('NFC')))].slice(0, 3);
                 if (cache.size >= 20000) cache.clear();
                 cache.set(word, suggestions);
