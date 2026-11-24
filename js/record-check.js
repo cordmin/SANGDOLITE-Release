@@ -110,6 +110,8 @@ const RC_SPELL_FIXED = [
     [/^[ \t]*(?:\d{1,2}[.)](?!\d)|[①-⑳]|[-•▪](?=\s))[ \t]*/gm, '번호·기호'], // ★ 같은 특수문자는 아래 규칙에서 한 번만 잡음
     [/[★☆♥♡◆◇■□▶▷◀◁※♣♠◎]/g, '특수문자']
 ];
+// 흔히 쓰는 영어 약어: 관리자 지침과 상관없이 기재 점검에서 넘어감
+const RC_EN_OK = /^(?:UFO|DIY)$/;
 // 바로 고쳐 줄 수 없는 것(설명만 보여 줌)
 const RC_SPELL_NOTE = {
     '띄어쓰기 한 번': '띄어쓰기가 두 번 이상 들어갔어요.',
@@ -783,6 +785,13 @@ function rcCheckOne(rec, settings, byteLen) {
             if (rule.skip && rule.skip.test(m[0])) continue;
             // '방과후학교스포츠클럽'은 정규교육과정 밖의 학교스포츠클럽 활동이라 방과후학교 수강과 다름 (나이스가 동아리 머리말에 붙임)
             if (/^\s*스포츠\s*클럽/.test(text.slice(m.index + m[0].length))) continue;
+            if (RC_EN_OK.test(m[0])) continue;
+            // '학과 및 자격증 등을 조사'처럼 알아본 것은 넘어가고, 같은 문장에 취득·합격 같은 말이 있을 때만 잡음
+            if (m[0] === '자격증') {
+                const from = Math.max(text.lastIndexOf('.', m.index), text.lastIndexOf('\n', m.index)) + 1;
+                const end = text.slice(m.index).search(/[.\n]/);
+                if (!/취득|합격|획득|보유|소지|응시|땄|따[고서기는]/.test(text.slice(from, end < 0 ? text.length : m.index + end))) continue;
+            }
             if (prev && prev.end === m.index) { prev.issue.what += m[0]; prev.end += m[0].length; continue; }
             add('forbid', rule.level, m[0], rule.why);
             prev = { issue: issues[issues.length - 1], end: m.index + m[0].length };
@@ -791,6 +800,11 @@ function rcCheckOne(rec, settings, byteLen) {
 
     for (const [re, right] of RC_SPELL_RULES) {
         for (const m of text.matchAll(re)) {
+            // '탐구지에'의 '구지'처럼 낱말 가운데에 걸린 것은, 사전이 그 낱말 전체를 알면 넘어감 ('안됬다'는 사전이 몰라서 계속 잡음)
+            if (settings.spellings && /[가-힣]/.test(text[m.index - 1] || '') && /^[가-힣]/.test(m[0])) {
+                const word = (text.slice(0, m.index).match(/[\p{L}\p{N}]+$/u) || [''])[0] + (text.slice(m.index).match(/^[\p{L}\p{N}]+/u) || [''])[0];
+                if (/^[가-힣]{2,}$/.test(word) && !(word in settings.spellings)) continue;
+            }
             const fix = m[0].replace(re, right);
             add('spell', 'check', m[0], RC_SPELL_NOTE[right] || `'${m[0].trim()}' → '${fix.trim()}'`, RC_SPELL_NOTE[right] ? null : fix);
         }
@@ -847,16 +861,18 @@ function rcCheckAll(records, settings, byteLen) {
         groups.get(k).push({ ...r, passages: rcExactPassages(r.rec.text) });
     });
     for (const list of groups.values()) {
+        const same = list.map(() => new Map()); // 학생별: 겹치는 문장 → 같은 문장이 있는 학생들
+        const note = (k, passage, other) => { if (!same[k].has(passage)) same[k].set(passage, []); same[k].get(passage).push(other); };
         for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
             const a = list[i], b = list[j];
             if (['grade', 'cls', 'num', 'name'].every(key => (a.rec[key] || '') === (b.rec[key] || ''))) continue;
             const shared = [...a.passages].filter(p => b.passages.has(p)).sort((x, y) => y.length - x.length);
             const matches = shared.filter((p, index) => !shared.slice(0, index).some(longer => longer.includes(p)));
-            for (const passage of matches) {
-                a.issues.push({ type: 'similar', level: 'check', what: passage, why: `${rcWho(b.rec)} 기록에 100% 동일한 문장 또는 문단이 있어요.` });
-                b.issues.push({ type: 'similar', level: 'check', what: passage, why: `${rcWho(a.rec)} 기록에 100% 동일한 문장 또는 문단이 있어요.` });
-            }
+            for (const passage of matches) { note(i, passage, b.rec); note(j, passage, a.rec); }
         }
+        // 같은 문장이 여러 학생에게 있으면 '○○ 외 n명'으로 한 번만 알려 줌
+        same.forEach((map, k) => map.forEach((others, passage) => list[k].issues.push({ type: 'similar', level: 'check', what: passage,
+            why: `${rcWho(others[0])}${others.length > 1 ? ` 외 ${others.length - 1}명` : ''} 기록에 100% 동일한 문장 또는 문단이 있어요.` })));
     }
     return results;
 }
