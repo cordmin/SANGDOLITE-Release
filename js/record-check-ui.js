@@ -67,7 +67,7 @@ async function rcAddFiles(list) {
             loaded = { name: file.name, records, isPdf };
             rcFiles = [loaded];
             rcRunVersion++;
-            rcChecking = false;
+            rcChecking = true;   // 바로 점검을 시작함 (점검 중에는 표에 '결과가 없어요'를 띄우지 않음)
             rcResults = null;
             rcLoading(null);
         } catch (e) {
@@ -247,6 +247,7 @@ async function rcRun(barFrom = 0) {
             rcChecking = false;
             rcLoading(null);
             rcRenderFiles();
+            if (!rcResults) rcRenderResults();   // 점검을 못 끝냈을 때만 '결과가 없어요' 안내
         }
     }
 }
@@ -297,7 +298,7 @@ function rcRenderResults() {
     document.getElementById('rc-import').hidden = !!(rcResults || rcFiles.length);
 
     if (!rcResults) {
-        const ready = rcFiles.length ? `<td colspan="6" class="rc-empty"><span class="rc-empty-msg">점검 결과가 없어요. 파일을 닫고 다시 불러오면 다시 점검해요.</span></td>` : '<td colspan="6"></td>';
+        const ready = rcFiles.length && !rcChecking ? `<td colspan="6" class="rc-empty"><span class="rc-empty-msg">점검 결과가 없어요. 파일을 닫고 다시 불러오면 다시 점검해요.</span></td>` : '<td colspan="6"></td>';
         tbody.innerHTML = `<tr class="filler-row" style="height:100%">${ready}</tr>`;
         return;
     }
