@@ -247,6 +247,8 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-mark.rc-check { background: #fde68a; color: #78350f; }
 /* 사전이 모르는 낱말: 배경 없이 빨간 물결 밑줄만 */
 .rc-mark.rc-dict { background: none; color: inherit; text-decoration: underline wavy #dc2626; text-decoration-skip-ink: none; text-underline-offset: 3px; }
+/* 외래어: 맞춤법 밑줄과 구별되게 보라색 물결 */
+.rc-mark.rc-dict.rc-loan { text-decoration-color: #7c3aed; }
 /* 똑같은 문장: 학생 이름에 커서를 올리면 그 학생과 같은 문장만 진하게, 나머지 똑같은 문장 표시는 잠깐 끔 */
 .rc-dup-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .rc-dup-name { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: #334155; font-size: 12px; line-height: 1.5; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s; }

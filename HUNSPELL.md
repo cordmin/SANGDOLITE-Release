@@ -28,7 +28,8 @@ Hunspell 한국어 사전을 사용합니다. 문장 생성 결과에는 보조 
   Hunspell이 알면(예: 정해진) 밑줄을 긋지 않습니다. ‘금새’(물건값)처럼 사전에 있는
   낱말과 같은 꼴의 오타는 이 방식으로 잡지 못합니다.
   붙여 쓴 말을 나눠 볼 때는 같은 사전에서 외래어로 표시된 말
-  (`assets/nikl-nouns/loanwords.txt`, 약 2만 3천 개)을 조각으로 쓰지 않아, 외래어를 붙인 말은 계속 밑줄을 긋습니다.
+  (`assets/nikl-nouns/loanwords.txt`, 표준국어대사전·우리말샘, 약 19만 개)을 조각으로 쓰지 않아, 외래어를 붙인 말은 계속 밑줄을 긋습니다.
+  사전이 모르는 말 중 이 목록의 외래어는 보라색 밑줄로 ‘외래어’ 탭에서 따로 셉니다.
   가공 방법은 같은 폴더의 `LICENSE.md`를 참고하십시오.
 - 엔진: `hunspell-wasm` **0.3.0**. [원본 소스](https://github.com/rotemdan/hunspell-wasm),
   [원본 패키지](https://registry.npmjs.org/hunspell-wasm/-/hunspell-wasm-0.3.0.tgz).

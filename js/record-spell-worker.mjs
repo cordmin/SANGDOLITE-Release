@@ -44,7 +44,7 @@ const RC_TAIL_MORE = '형면상지화력식문목기';
 // '게이트키퍼'·'플라잉디스크'처럼 외래어를 붙인 말은 밑줄을 남기려고, 표준국어대사전이 외래어로 표시한 말(assets/nikl-nouns/loanwords.txt)은 조각으로 쓰지 않음
 function rcKnownMore(dictionary, word) {
     const known = w => w.length >= 2 && (dictionary.testSpelling(w) || dictionary.nouns.has(w));
-    const piece = w => !dictionary.loanwords.has(w) && (dictionary.testSpelling(w) ? w.length >= 2 : w.length >= 3 && dictionary.nouns.has(w));
+    const piece = w => !rcIsLoan(dictionary, w) && (dictionary.testSpelling(w) ? w.length >= 2 : w.length >= 3 && dictionary.nouns.has(w));
     const pair = w => known(w) || [...w].some((_, i) => i >= 2 && piece(w.slice(0, i)) && (w.length - i >= 2 ? piece(w.slice(i)) : RC_TAIL_MORE.includes(w.slice(i))));
     const suffix = w => { const m = w.match(/^(.{2,})적(?:으로|인|이고|이며)?$/); return !!m && pair(m[1]); };
     const core = w => pair(w) || suffix(w) || (w.length >= 3 && RC_PREFIX.includes(w[0]) && (pair(w.slice(1)) || suffix(w.slice(1))));
@@ -69,6 +69,21 @@ function rcKnownExtra(dictionary, word, split = true) {
     return split && rcKnownMore(dictionary, word);
 }
 
+// 사전이 모르는 말 중 외래어: 그대로 또는 조사를 떼면 국립국어원 외래어 목록에 있거나('아트의'),
+// 외래어·아는 말 두 조각으로 나뉘고 그중 하나가 외래어('플라잉디스크를')면 외래어로 봄
+// 외래어 목록은 크기를 줄이려고 '스타일리스트'(스타일+리스트)처럼 목록 낱말로 나뉘는 말을 뺐음. 그래서 나눠서도 찾음
+function rcIsLoan(dictionary, w, depth = 0) {
+    if (dictionary.loanwords.has(w)) return true;
+    if (depth >= 2) return false;
+    return [...w].some((_, i) => i >= 2 && w.length - i >= 2 && dictionary.loanwords.has(w.slice(0, i)) && rcIsLoan(dictionary, w.slice(i), depth + 1));
+}
+function rcLoanLike(dictionary, word) {
+    const piece = w => w.length >= 2 && (rcIsLoan(dictionary, w) || dictionary.testSpelling(w));
+    const loan = w => rcIsLoan(dictionary, w) || [...w].some((_, i) => i >= 2 && w.length - i >= 2 && piece(w.slice(0, i)) && piece(w.slice(i))
+        && (rcIsLoan(dictionary, w.slice(0, i)) || rcIsLoan(dictionary, w.slice(i))));
+    return loan(word) || [...RC_JOSA, ...RC_JOSA_MORE].some(e => word.endsWith(e) && word.length - e.length >= 2 && loan(word.slice(0, -e.length)));
+}
+
 self.onmessage = async ({ data: { id, words, exact } }) => {
     try {
         ready ||= loadDictionary().catch(error => { ready = null; throw error; });
@@ -86,7 +101,7 @@ self.onmessage = async ({ data: { id, words, exact } }) => {
             }
             if (cache.get(word) !== null) spellings[word] = cache.get(word);
         }
-        self.postMessage({ id, spellings });
+        self.postMessage({ id, spellings, loans: Object.keys(spellings).filter(word => rcLoanLike(dictionary, word)) });
     } catch (error) {
         self.postMessage({ id, error: error.message || '한국어 맞춤법 점검 중 문제가 생겼어요.' });
     }

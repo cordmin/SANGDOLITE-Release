@@ -24,6 +24,7 @@ const RC_TYPES = {
     forbid: '기재 요령',
     length: '최대 글자수',
     spell: '맞춤법',
+    loan: '외래어',   // 사전이 모르는 말 중 국립국어원 외래어 목록에 있는 말 (밑줄만, 고칠 점 문구 없음)
     ending: '종결 어미',
     similar: '똑같은 문장',
     empty: '미입력 항목'
@@ -861,7 +862,8 @@ function rcCheckAll(records, settings, byteLen) {
     const off = new Set(settings.off || []);
     const results = records.map(rec => {
         const issues = rcCheckOne(rec, settings, byteLen).filter(i => !off.has(i.type));
-        return { rec, issues, marks: off.has('spell') ? [] : rcDictMarks(rec.text, settings.spellings, issues) };
+        const dict = off.has('spell') ? [] : rcDictMarks(rec.text, settings.spellings, issues), loans = new Set(settings.loans || []);
+        return { rec, issues, marks: dict.filter(w => !loans.has(w)), loanMarks: dict.filter(w => loans.has(w)) };
     });
     if (off.has('similar')) return results;
     // 같은 영역·과목의 다른 학생끼리 비교. ponytail: 수천 명이면 문장 색인으로 바꿀 것
@@ -921,12 +923,13 @@ function rcWho(rec) {
 }
 
 // 기록 글에 문제 부분을 표시한 HTML. dict: 사전이 모르는 낱말(밑줄만, '과학고등학교' 속 '학고'처럼 낱말 중간에는 안 그음)
-function rcHighlight(text, issues, dict = []) {
+function rcHighlight(text, issues, dict = [], loan = []) {
     const words = [...new Set(issues.map(i => i.what).filter(w => w && w.trim()))];
+    dict = [...dict, ...loan];
     const marks = [...words, ...dict.filter(w => !words.includes(w))].sort((a, b) => b.length - a.length);
     let html = rcEscape(text);
     if (!marks.length) return html.replace(/\n/g, '<br>');
-    const levelOf = w => (!words.includes(w) ? 'dict' : issues.some(i => i.what === w && i.level === 'no') ? 'no' : 'check');
+    const levelOf = w => (!words.includes(w) ? (loan.includes(w) ? 'dict rc-loan' : 'dict') : issues.some(i => i.what === w && i.level === 'no') ? 'no' : 'check');
     const re = new RegExp(marks.map(w => {
         const plain = rcEscape(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return words.includes(w) ? plain : `(?<![가-힣])${plain}(?=님|[^가-힣]|$)`;

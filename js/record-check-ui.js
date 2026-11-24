@@ -233,9 +233,9 @@ async function rcRun(barFrom = 0) {
     rcRenderFiles();
     rcLoading('점검하는 중이에요', '', barFrom);
     try {
-        const spellings = await rcCheckSpelling(records);
+        const { spellings, loans } = (await rcCheckSpelling(records)) || {};
         if (version !== rcRunVersion || files.length !== rcFiles.length || files.some((file, i) => file !== rcFiles[i])) return;
-        rcResults = rcCheckAll(records, { spellings, limits: RC_DEFAULT_SETTINGS.limits }, getByteLength);
+        rcResults = rcCheckAll(records, { spellings, loans, limits: RC_DEFAULT_SETTINGS.limits }, getByteLength);
         rcTab = 'all';
         rcQuery = '';
         document.getElementById('rc-search').value = '';
@@ -255,13 +255,16 @@ async function rcRun(barFrom = 0) {
 const RC_FILLER = '<tr class="filler-row" style="height:100%"><td></td><td></td><td></td><td></td><td></td><td class="excel-byte"></td></tr>';
 
 // 지금 화면에 보이는 줄 (필터·검색 반영). 화면과 '결과 내려받기'가 같이 씀
-// withMarks: 화면에서는 사전 밑줄만 있는 학생도 보여 줌 (전체·맞춤법 보기에서만, 학생 수에는 안 셈). 엑셀에는 안 담음
+// withMarks: 화면에서는 사전 밑줄만 있는 학생도 보여 줌 (맞춤법 밑줄은 전체·맞춤법, 외래어 밑줄은 전체·외래어 보기에서). 엑셀에는 안 담음
+function rcHasMarks(r, tab) {
+    return ((tab === 'all' || tab === 'spell') && (r.marks || []).length > 0) || ((tab === 'all' || tab === 'loan') && (r.loanMarks || []).length > 0);
+}
 function rcVisibleRows(withMarks = false) {
     const q = rcQuery.trim();
-    const marksOn = withMarks && (rcTab === 'all' || rcTab === 'spell');
+    const on = tab => withMarks && (rcTab === 'all' || rcTab === tab);
     return (rcResults || [])
-        .map(r => ({ ...r, shown: r.issues.filter(i => rcTab === 'all' || i.type === rcTab), dict: marksOn ? r.marks || [] : [] }))
-        .filter(r => (r.shown.length || r.dict.length) && (!q || rcWho(r.rec).includes(q) || r.rec.subject.includes(q) || r.rec.area.includes(q)));
+        .map(r => ({ ...r, shown: r.issues.filter(i => rcTab === 'all' || i.type === rcTab), dict: on('spell') ? r.marks || [] : [], loan: on('loan') ? r.loanMarks || [] : [] }))
+        .filter(r => (r.shown.length || r.dict.length || r.loan.length) && (!q || rcWho(r.rec).includes(q) || r.rec.subject.includes(q) || r.rec.area.includes(q)));
 }
 
 // 학번: 1학년 3반 1번 → 10301 (숫자가 모자라면 있는 것만 이어 씀)
@@ -284,7 +287,7 @@ function rcRenderResults() {
     const filter = document.getElementById('rc-type-filter');
     filter.innerHTML = '<button type="button"><selectedcontent></selectedcontent></button>' + tabs.map(([t, label]) => {
         // 표에 나올 학생 수 (검색어와 상관없이)
-        const n = (rcResults || []).filter(r => r.issues.some(issue => t === 'all' || issue.type === t)).length;
+        const n = (rcResults || []).filter(r => r.issues.some(issue => t === 'all' || issue.type === t) || rcHasMarks(r, t)).length;
         const count = rcResults ? ` <span class="rc-filter-count${n ? '' : ' rc-zero'}" aria-label="${n}명">${n}</span>` : '';
         return `<option value="${t}"><span class="rc-filter-label">${label}</span>${count}</option>`;
     }).join('');
@@ -311,7 +314,7 @@ function rcRenderResults() {
                 `<span class="rc-dup-name" tabindex="0" aria-label="${rcEscape(p.who)}과(와) 같은 문장 ${p.passages.length}개" data-passages="${rcEscape(JSON.stringify(p.passages))}">${rcEscape(rcStudentId(p.rec))} ${rcEscape(p.rec.name)}</span>`).join('')}</span>`
             : rcEscape(x.why)}</li>`).join('');
         return `<tr><td class="rc-who"><b>${rcEscape(r.rec.name)}</b></td><td class="rc-id">${rcEscape(rcStudentId(r.rec))}</td><td class="rc-where">${where}</td>`
-            + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown, r.dict) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
+            + `<td class="result-cell rc-text">${rcHighlight(r.rec.text, r.shown, r.dict, r.loan) || '<span class="rc-blank">(비어 있음)</span>'}</td>`
             + `<td class="rc-fix"><ul>${fixes}</ul></td><td class="excel-byte">${getByteLength(r.rec.text)} Byte</td></tr>`;
     }).join('') + RC_FILLER;
 }

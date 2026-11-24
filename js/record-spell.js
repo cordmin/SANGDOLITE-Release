@@ -6,7 +6,7 @@ const rcSpellPending = new Map();
 const rcSpellVersion = (typeof document !== 'undefined' && document.currentScript?.src.split('?')[1]) || '';
 
 function rcCheckSpelling(records) {
-    return rcSpellAsk({ words: [...new Set(records.flatMap(rec => rcSpellWords(rec.text)))] }).then(data => data.spellings);
+    return rcSpellAsk({ words: [...new Set(records.flatMap(rec => rcSpellWords(rec.text)))] }).then(({ spellings, loans }) => ({ spellings, loans }));
 }
 
 // 사전에 그대로 있는 낱말 모음 (PDF 줄바꿈 자리 띄어쓰기 판단용)
