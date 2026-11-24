@@ -4,13 +4,14 @@ let ready;
 const cache = new Map();
 
 async function loadDictionary() {
-    const [aff, dic, nouns] = await Promise.all(['hunspell-ko/ko.aff', 'hunspell-ko/ko.dic', 'nikl-nouns/nouns.txt'].map(async name => {
+    const [aff, dic, nouns, loanwords] = await Promise.all(['hunspell-ko/ko.aff', 'hunspell-ko/ko.dic', 'nikl-nouns/nouns.txt', 'nikl-nouns/loanwords.txt'].map(async name => {
         const response = await fetch(new URL(`../assets/${name}`, import.meta.url));
         if (!response.ok) throw new Error('한국어 맞춤법 사전을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
         return response.text();
     }));
     const dictionary = await createHunspellFromStrings(aff, dic);
     dictionary.nouns = new Set(nouns.split(/\r?\n/)); // 윈도에서 받으면 줄 끝이 \r\n일 수 있음
+    dictionary.loanwords = new Set(loanwords.split(/\r?\n/));
     return dictionary;
 }
 
@@ -33,12 +34,37 @@ const RC_JOSA = ['에서는', '으로는', '에서', '으로', '에게', '까지
     '을', '를', '이', '가', '은', '는', '에', '의', '과', '와', '로', '도', '만', '나'];
 const RC_HADA = ['함으로써', '하였으며', '하였음', '하였다', '하였고', '했으며', '하면서', '하고자', '하는데', '했다', '했음', '했고', '했던',
     '하여', '하고', '하는', '하며', '하기', '하게', '해서', '하던', '하면', '함', '한', '할'];
+// 그 밖에 바른 말인데 사전이 몰랐던 꼴: '조형적(으로)', '미제출(된)'·'비언어적', '다항식에서도'·'하나씩',
+// 아는 말 두 개를 붙인 '석회조류'·'원반형'·'활동지'
+const RC_JOSA_MORE = ['에서도', '에서의', '이라는', '으로서', '으로도', '라는', '임을', '이란', '로서', '로도', '에도', '에는', '과도', '와도', '씩'];
+const RC_DOEDA = ['되었으며', '되었다', '되었음', '되어', '되는', '되고', '되며', '된', '됨'];
+const RC_PREFIX = '미재과반오비참왕대초';
+const RC_TAIL_MORE = '형면상지화력식문목기';
+// 붙인 말 조각: 사전이 아는 말, 또는 명사 목록의 3글자 이상 ('개구+장이'처럼 짧은 목록 낱말로 오타가 통과하지 않게).
+// '게이트키퍼'·'플라잉디스크'처럼 외래어를 붙인 말은 밑줄을 남기려고, 표준국어대사전이 외래어로 표시한 말(assets/nikl-nouns/loanwords.txt)은 조각으로 쓰지 않음
+function rcKnownMore(dictionary, word) {
+    const known = w => w.length >= 2 && (dictionary.testSpelling(w) || dictionary.nouns.has(w));
+    const piece = w => !dictionary.loanwords.has(w) && (dictionary.testSpelling(w) ? w.length >= 2 : w.length >= 3 && dictionary.nouns.has(w));
+    const pair = w => known(w) || [...w].some((_, i) => i >= 2 && piece(w.slice(0, i)) && (w.length - i >= 2 ? piece(w.slice(i)) : RC_TAIL_MORE.includes(w.slice(i))));
+    const suffix = w => { const m = w.match(/^(.{2,})적(?:으로|인|이고|이며)?$/); return !!m && pair(m[1]); };
+    const core = w => pair(w) || suffix(w) || (w.length >= 3 && RC_PREFIX.includes(w[0]) && (pair(w.slice(1)) || suffix(w.slice(1))));
+    if (core(word)) return true;
+    for (const end of [...RC_JOSA, ...RC_JOSA_MORE, ...RC_DOEDA]) {
+        if (!word.endsWith(end) || word.length - end.length < 2) continue;
+        const stem = word.slice(0, -end.length);
+        // '꼼꼼이'처럼 '이'를 떼면 부사 오타가 통과해서, '이' 앞은 명사 목록이나 두 낱말 붙임만 봄
+        if (end === '이' ? dictionary.nouns.has(stem) || (stem.length >= 3 && pair(stem)) : core(stem)) return true;
+    }
+    return false;
+}
+
 function rcKnownExtra(dictionary, word) {
     const { nouns } = dictionary;
     const stemIs = (ends, test) => ends.some(e => word.endsWith(e) && word.length - e.length >= 2 && test(word.slice(0, -e.length)));
     if (nouns.has(word) || stemIs(RC_JOSA, s => nouns.has(s))) return true;
     if (stemIs(RC_HADA, s => nouns.has(s) || dictionary.testSpelling(s))) return true;
-    return word.length >= 3 && word.endsWith('진') && dictionary.testSpelling(word.slice(0, -1) + '지다');
+    if (word.length >= 3 && word.endsWith('진') && dictionary.testSpelling(word.slice(0, -1) + '지다')) return true;
+    return rcKnownMore(dictionary, word);
 }
 
 self.onmessage = async ({ data: { id, words, exact } }) => {

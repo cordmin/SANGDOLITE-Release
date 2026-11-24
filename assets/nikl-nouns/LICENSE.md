@@ -1,4 +1,4 @@
-# 맞춤법 보조 명사 목록 (nouns.txt)
+# 맞춤법 보조 명사 목록 (nouns.txt)·외래어 목록 (loanwords.txt)
 
 국립국어원 「표준국어대사전」·「한국어기초사전」 자료(2026년 6월 내려받기,
 https://github.com/spellcheck-ko/korean-dict-nikl)를 가공해 만든 명사 목록입니다.
@@ -6,7 +6,7 @@ https://github.com/spellcheck-ko/korean-dict-nikl)를 가공해 만든 명사 �
 - 저작권: 국립국어원
 - 라이선스: 크리에이티브 커먼즈 저작자표시-동일조건변경허락 2.0 대한민국 (CC BY-SA 2.0 KR)
   https://creativecommons.org/licenses/by-sa/2.0/kr/
-- 이 목록 파일(nouns.txt)도 같은 CC BY-SA 2.0 KR 조건으로 제공합니다.
+- 이 목록 파일(nouns.txt, loanwords.txt)도 같은 CC BY-SA 2.0 KR 조건으로 제공합니다.
 
 ## 가공 방법
 
@@ -16,3 +16,10 @@ https://github.com/spellcheck-ko/korean-dict-nikl)를 가공해 만든 명사 �
 - 붙임표·띄어쓰기·동음이의어 번호를 지우고, 한글 2글자 이상만 남겼습니다.
 - Hunspell 한국어 사전 0.7.94가 이미 아는 낱말은 뺐습니다.
 - 뜻풀이·예문·미디어 파일은 포함하지 않았습니다.
+
+## 외래어 목록 (loanwords.txt)
+
+- 표준국어대사전에서 어종이 ‘외래어’인 표제어와, ‘혼종어’ 중 고유어·한자 말고 다른 말이 섞인 표제어를 뽑았습니다.
+- 붙임표·띄어쓰기·동음이의어 번호를 지우고 한글 2글자 이상만 남겼습니다.
+- 맞춤법 점검이 붙여 쓴 말을 나눠 볼 때 조각으로 쓰는 낱말(Hunspell 한국어 사전이 알거나 nouns.txt에 있는 말)만 남겼습니다.
+- 붙여 쓴 말을 나눠 볼 때 이 목록의 말은 조각으로 쓰지 않습니다. 외래어를 붙인 말은 계속 밑줄을 긋기 위해서입니다.
