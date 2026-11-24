@@ -27,12 +27,17 @@ function rcKnown(dictionary, word, depth = 0) {
     return false;
 }
 
-// 사전이 모르는 '마찰력을'·'정해진' 보완: 조사를 떼고 국립국어원 명사 목록(assets/nikl-nouns)에서 찾거나, '~진'을 '~지다'로 바꿔 확인
+// 사전이 모르는 '마찰력을'·'정해진'·'가창함' 보완: 조사를 떼고 국립국어원 명사 목록(assets/nikl-nouns)에서 찾거나,
+// '명사+함·했다' 꼴이면 명사를 확인하거나, '~진'을 '~지다'로 바꿔 확인
 const RC_JOSA = ['에서는', '으로는', '에서', '으로', '에게', '까지', '부터', '처럼', '보다', '만큼', '이나', '이라', '과의', '와의',
     '을', '를', '이', '가', '은', '는', '에', '의', '과', '와', '로', '도', '만', '나'];
+const RC_HADA = ['함으로써', '하였으며', '하였음', '하였다', '하였고', '했으며', '하면서', '하고자', '하는데', '했다', '했음', '했고', '했던',
+    '하여', '하고', '하는', '하며', '하기', '하게', '해서', '하던', '하면', '함', '한', '할'];
 function rcKnownExtra(dictionary, word) {
     const { nouns } = dictionary;
-    if (nouns.has(word) || RC_JOSA.some(j => word.endsWith(j) && word.length - j.length >= 2 && nouns.has(word.slice(0, -j.length)))) return true;
+    const stemIs = (ends, test) => ends.some(e => word.endsWith(e) && word.length - e.length >= 2 && test(word.slice(0, -e.length)));
+    if (nouns.has(word) || stemIs(RC_JOSA, s => nouns.has(s))) return true;
+    if (stemIs(RC_HADA, s => nouns.has(s) || dictionary.testSpelling(s))) return true;
     return word.length >= 3 && word.endsWith('진') && dictionary.testSpelling(word.slice(0, -1) + '지다');
 }
 

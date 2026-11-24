@@ -22,9 +22,11 @@ Hunspell 한국어 사전을 사용합니다. 문장 생성 결과에는 보조 
   `LICENSE.GPL-3`를 참고하십시오.
 - 보조 명사 목록: 국립국어원 「표준국어대사전」·「한국어기초사전」 자료
   ([korean-dict-nikl](https://github.com/spellcheck-ko/korean-dict-nikl))를 가공한
-  `assets/nikl-nouns/nouns.txt` (약 10만 8천 개, 1.3MB). CC BY-SA 2.0 KR.
+  `assets/nikl-nouns/nouns.txt` (약 15만 개, 1.6MB). CC BY-SA 2.0 KR.
   Hunspell이 모르는 낱말은 끝의 조사를 떼고 이 목록에 있으면(예: 마찰력을),
-  또는 ‘~진’을 ‘~지다’로 바꿔 Hunspell이 알면(예: 정해진) 밑줄을 긋지 않습니다.
+  ‘명사+함·했다·하는’ 꼴이면(예: 가창함), 또는 ‘~진’을 ‘~지다’로 바꿔
+  Hunspell이 알면(예: 정해진) 밑줄을 긋지 않습니다. ‘금새’(물건값)처럼 사전에 있는
+  낱말과 같은 꼴의 오타는 이 방식으로 잡지 못합니다.
   가공 방법은 같은 폴더의 `LICENSE.md`를 참고하십시오.
 - 엔진: `hunspell-wasm` **0.3.0**. [원본 소스](https://github.com/rotemdan/hunspell-wasm),
   [원본 패키지](https://registry.npmjs.org/hunspell-wasm/-/hunspell-wasm-0.3.0.tgz).
