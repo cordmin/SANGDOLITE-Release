@@ -218,6 +218,18 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 .rc-loading-sub:empty { display: none; }
 @keyframes rc-write { from { transform: translateY(-100%) rotate(-7deg); } to { transform: translateY(-100%) rotate(5deg); } }
 @keyframes rc-fade { from { opacity: 0; } }
+.rc-pdf-stack { position: relative; width: 80px; height: 64px; margin-bottom: 12px; }
+.rc-pdf-stack span { position: absolute; left: 50%; width: 34px; height: 44px; margin-left: -17px; border: 1.5px solid #b94646; border-radius: 4px; background: #fff; }
+.rc-pdf-stack span::after { content: 'PDF'; position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 9px; font-weight: 800; letter-spacing: .5px; color: #b94646; }
+.rc-pdf-stack span:nth-child(1) { top: 16px; transform: rotate(-8deg) translateX(-6px); }
+.rc-pdf-stack span:nth-child(2) { top: 12px; transform: rotate(5deg) translateX(5px); }
+.rc-pdf-stack span:nth-child(3) { top: 8px; animation: rc-pdf-drop .9s ease-out infinite; }
+@keyframes rc-pdf-drop { from { transform: translateY(-26px); opacity: 0; } 60% { opacity: 1; } to { transform: translateY(0); opacity: 1; } }
+.rc-pdf-title { margin: 0; font-size: 18px; font-weight: 800; color: #1e293b; }
+.rc-pdf-count { margin: 6px 0 0; font-size: 13.5px; color: #64748b; font-variant-numeric: tabular-nums; }
+.rc-pdf-bar { position: relative; width: 200px; height: 10px; margin-top: 16px; border-radius: 999px; background: #f1d4d4; overflow: hidden; }
+.rc-pdf-bar div { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 999px; background: #b94646; transition: width .3s ease-out; }
+@media (prefers-reduced-motion: reduce) { .rc-pdf-stack span:nth-child(3) { animation-duration: 3s; } }
 @media (prefers-reduced-motion: reduce) { .rc-pencil, .rc-word span { animation-duration: 3s; } }
 #rc-drop.over .rc-import-panel { background: #eef3f8; border-color: #526b89; }
 @media (max-width: 480px) { .rc-import { padding: 16px; } .rc-import-panel { padding: 28px 20px; } .rc-import-panel h2 { font-size: 17px; } }

@@ -14,7 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
     <!-- ?v= 숫자: 파일을 고쳐 올릴 때마다 바꾸면 브라우저가 예전 파일 대신 새 파일을 받아요 -->
-    <link rel="stylesheet" href="css/style.css?v=20261124-pdf-download">
+    <link rel="stylesheet" href="css/style.css?v=20261124-pdf-loading">
 </head>
 <body class="min-h-screen min-[1100px]:h-screen min-[1100px]:overflow-hidden bg-[#0f172a] text-[#1e293b] flex flex-col min-[1100px]:flex-row">
 
@@ -344,6 +344,14 @@
                         <p id="rc-loading-sub" class="rc-loading-sub"></p>
                     </div>
                 </div>
+                <div id="rc-pdf-loading" class="rc-loading rc-pdf-loading" role="status" aria-live="polite" hidden>
+                    <div class="rc-loading-panel">
+                        <div class="rc-pdf-stack" aria-hidden="true"><span></span><span></span><span></span></div>
+                        <p class="rc-pdf-title">PDF 파일 만드는 중</p>
+                        <p id="rc-pdf-count" class="rc-pdf-count"></p>
+                        <div class="rc-pdf-bar" aria-hidden="true"><div id="rc-pdf-fill"></div></div>
+                    </div>
+                </div>
                 <div class="flex-1 min-h-0 overflow-auto custom-scrollbar" style="scrollbar-gutter: stable;">
                 <table class="excel-table rc-table" style="table-layout: fixed; min-width: 760px; height: 100%;">
                     <colgroup><col style="width:76px"><col style="width:72px"><col style="width:132px"><col><col><col style="width:96px"></colgroup>
@@ -359,6 +367,6 @@
     <script src="js/app.js?v=20261123-release-2.1.9"></script>
     <script src="js/record-check.js?v=20261124-loan-tab"></script>
     <script src="js/record-spell.js?v=20261124-loan-tab"></script>
-    <script src="js/record-check-ui.js?v=20261124-pdf-download"></script>
+    <script src="js/record-check-ui.js?v=20261124-pdf-loading"></script>
 </body>
 </html>

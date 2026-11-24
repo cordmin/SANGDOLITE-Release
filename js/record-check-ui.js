@@ -405,6 +405,15 @@ function rcPdfFontCss() {
 }
 
 // 내려받기: 화면과 같은 표를 A4 가로 쪽마다 그림으로 찍어 PDF 파일로 바로 저장
+// PDF 만드는 중 표시: 점검 로딩(LOADING·연필)과 헷갈리지 않게 PDF 종이가 쌓이는 모양 + 실제 몇 쪽째인지
+// done=null이면 숨김, total=0이면 아직 준비 중(도구·글꼴 받는 중)
+function rcPdfProgress(done, total = 0) {
+    const box = document.getElementById('rc-pdf-loading');
+    box.hidden = done === null;
+    if (done === null) return;
+    document.getElementById('rc-pdf-count').textContent = total ? `${done} / ${total}쪽 · 다 되면 바로 내려받아져요` : '준비하는 중이에요';
+    document.getElementById('rc-pdf-fill').style.width = (total ? done / total * 100 : 0) + '%';
+}
 // ponytail: 쪽마다 그림이라 PDF 안 글자는 고를 수 없음. 한 학생 줄이 한 쪽보다 길면 그 쪽만 줄여서 담음
 const RC_PDF = { w: 297, h: 210, margin: 10, px: 96 / 25.4 };   // mm, 1mm = 3.78px
 async function rcDownloadPdf(types) {
@@ -412,7 +421,7 @@ async function rcDownloadPdf(types) {
     if (!rows.length) { showModal('알림', '내려받을 내용이 없어요.', 'info'); return; }
     const box = document.createElement('div');
     box.style.cssText = `position:fixed;left:-30000px;top:0;width:${Math.round((RC_PDF.w - RC_PDF.margin * 2) * RC_PDF.px)}px;background:#fff`;
-    rcLoading('PDF를 만드는 중이에요');
+    rcPdfProgress(0, 0);
     try {
         await rcLoadPdfLibs();
         box.innerHTML = rcSheetTable(rows);
@@ -431,6 +440,7 @@ async function rcDownloadPdf(types) {
         const fontEmbedCSS = await rcPdfFontCss();
         const pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         for (const [n, page] of pages.entries()) {
+            rcPdfProgress(n + 1, pages.length);
             const body = table.tBodies[0];
             [...body.rows].forEach(tr => { tr.hidden = !page.includes(tr); });
             const img = await htmlToImage.toJpeg(table, { pixelRatio: 2, quality: 0.92, backgroundColor: '#fff', fontEmbedCSS });
@@ -444,7 +454,7 @@ async function rcDownloadPdf(types) {
         showToast(`PDF를 만들지 못했어요. ${error.message}`, 'error');
     } finally {
         box.remove();
-        rcLoading(null);
+        rcPdfProgress(null);
     }
 }
 
