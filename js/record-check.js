@@ -190,7 +190,7 @@ function rcEscape(s) {
 // 나이스 엑셀은 위쪽에 제목 줄이 몇 줄 있고, 그 아래 '성명' 같은 머리글 줄이 있음.
 // 긴 글은 여러 줄로 나뉘어 있기도 해서, 이름 없이 글만 있는 줄은 바로 위 학생 글에 이어 붙임.
 const RC_HEAD = {
-    grade: /^학\s*년$/, cls: /^반$/, term: /^학\s*기$/, num: /^번\s*호?$/, name: /성\s*명|^이\s*름$/,
+    grade: /^학\s*년$/, cls: /^반$/, clsnum: /^반\s*\/\s*번\s*호$/, term: /^학\s*기$/, num: /^번\s*호?$/, name: /성\s*명|^이\s*름$/,
     subject: /과\s*목/, part: /영\s*역|활\s*동\s*명|^구\s*분$/,
     text: /특\s*기\s*사\s*항|종\s*합\s*의\s*견|세\s*부\s*능\s*력|활\s*동\s*내\s*용|^내\s*용$/
 };
@@ -250,11 +250,16 @@ function rcParseRows(rows, sheetName = '', fileName = '') {
     const headText = headRow >= 0 ? (rows[headRow] || []).join(' ') : '';
     const sheetArea = rcGuessArea(headText.match(RC_HEAD.text)?.[0], sheetName, fileName);
     const out = [];
-    let last = null, carry = {};
+    let last = null, carry = {}, fixedSubject = '';
     const RC_CLASS_CELL = /^([1-6])\s*학년\s*(\d{1,2})\s*반$/;
     for (const r of rows.slice(0, headRow)) for (const v of r || []) {   // 머리글 위 '1학년 1반'
         const m = String(v ?? '').trim().match(RC_CLASS_CELL);
         if (m) { carry.grade = m[1]; carry.cls = m[2]; }
+        // 과목별 세특 양식: 머리글 위 '교과목 : 과학', '2026학년도 2학기 주간 1학년 …'
+        const sm = String(v ?? '').trim().match(RC_SUBJ_LINE);
+        if (sm) fixedSubject = sm[1];
+        const gm = rcGradeLine(String(v ?? ''));
+        if (gm) carry.grade = gm;
     }
     for (const r of data) {
         const text = /^희망\s*분야$/.test(cell(r, col.text)) ? '' : cell(r, col.text);   // 진로활동 희망분야는 특기사항이 아님
@@ -269,6 +274,8 @@ function rcParseRows(rows, sheetName = '', fileName = '') {
         // 합쳐진 칸 때문에 비어 보이는 학년·반·번호·이름·과목은 위 줄 값을 이어 씀
         const newKind = !!(cell(r, col.subject) || cell(r, col.part)); // 같은 학생의 다른 과목·영역 줄
         for (const k of ['grade', 'cls', 'term', 'num', 'name', 'subject', 'part']) { const v = cell(r, col[k]); if (v) carry[k] = v; }
+        const cn = cell(r, col.clsnum).match(/^(\d+)\s*\/\s*(\d+)$/);   // '반/번호' 칸의 '1/3'
+        if (cn) { carry.cls = cn[1]; carry.num = cn[2]; }
         let name = cell(r, col.name);
         if (!name) {
             if (!newKind || !carry.name) {
@@ -280,8 +287,8 @@ function rcParseRows(rows, sheetName = '', fileName = '') {
         }
         if (RC_HEAD.name.test(name)) continue; // 중간에 다시 나오는 머리글 줄
         const rec = {
-            grade: carry.grade || '', cls: carry.cls || '', num: cell(r, col.name) ? cell(r, col.num) : carry.num || '', name,
-            subject: col.subject != null ? carry.subject || '' : '',
+            grade: carry.grade || '', cls: carry.cls || '', num: cell(r, col.name) && col.num != null ? cell(r, col.num) : carry.num || '', name,
+            subject: col.subject != null ? carry.subject || '' : fixedSubject,
             area: rcGuessArea(col.part != null ? carry.part : '') || sheetArea || (col.subject != null ? RC_SETUK : '기타'),
             text, term: carry.term || ''
         };
@@ -435,6 +442,9 @@ const rcNorm = t => t.replace(/\s+/g, '');
 const rcIsPdfHead = ln => { const n = rcNorm(ln.text); return n.includes('번호') && /성명|이름/.test(n) && !/담임|주민|보호자/.test(n); };
 const rcIsPdfFoot = ln => ln.text.length < 60 && /(^|\s)\d+\s*\/\s*\d+(\s|$)/.test(ln.text);
 const RC_CLASS_LINE = /([1-6])\s*학년\s*(\d{1,2})\s*반/;
+const RC_SUBJ_LINE = /교\s*과\s*목\s*[:：]\s*(.+?)\s*(?:\(\d+\))?\s*$/;   // '교과목 : 국어(4)'
+// '2026학년도 2학기 주간 1학년 1강의실' → '1'
+const rcGradeLine = t => /학년도/.test(t) && t.length < 60 ? t.match(/(?:^|\s)([1-6])\s*학년(?!도)/)?.[1] || '' : '';
 
 // 쪽 번호('3 / 12')·학교 이름이 있는 바닥 줄의 높이 (그 아래는 버림)
 function rcPdfFootY(lines) {
@@ -457,7 +467,7 @@ function rcPdfHeadCells(ln) {
 // 학생을 알려 주는 칸들. 그 밖의 칸(자유학기·학교자율시간 등)도 넣어 두어 거기 찍힌 글자가 이름에 섞이지 않게 함
 function rcPdfIdCols(cells) {
     const pick = re => cells.find(c => re.test(c.t));
-    const cols = { num: pick(/^번호?$/), name: pick(/^(성명|이름)$/), grade: pick(/^학년$/), term: pick(/^학기$/), subject: pick(/^과목$/) };
+    const cols = { num: pick(/^(반\/)?번호?$/), name: pick(/^(성명|이름)$/), grade: pick(/^학년$/), term: pick(/^학기$/), subject: pick(/^과목$/) };
     for (const k of Object.keys(cols)) if (!cols[k]) delete cols[k];
     if (!cols.num || !cols.name) return null;
     const known = Object.values(cols);
@@ -475,9 +485,10 @@ function rcPdfId(words, cols) {
         const m = w.x + w.w / 2;
         v[keys.reduce((a, b) => Math.abs(m - mid(cols[a])) <= Math.abs(m - mid(cols[b])) ? a : b)] += w.s;
     }
-    const num = parseInt(v.num, 10), subject = rcNorm(v.subject || '');
+    const cn = rcNorm(v.num).match(/^(\d+)\/(\d+)$/);   // '반/번호' 칸의 '1/3'
+    const num = parseInt(cn ? cn[2] : v.num, 10), subject = rcNorm(v.subject || '');
     if (!Number.isFinite(num)) return subject ? { subject } : null;
-    return { num: String(num), name: rcNorm(v.name), grade: rcNorm(v.grade || ''), term: rcNorm(v.term || ''), subject };
+    return { cls: cn ? cn[1] : '', num: String(num), name: rcNorm(v.name), grade: rcNorm(v.grade || ''), term: rcNorm(v.term || ''), subject };
 }
 
 function rcPdfBodyLine(items, y, page) {
@@ -623,8 +634,8 @@ function rcPdfSetukRows(pages) {
         const owner = rcCellOwner(body, ids.map(i => ({ x: numX, y: i.y })), rects) || rcCenterSplit(body, ids, !!cur);
         body.forEach((b, m) => {
             const id = ids[owner[m]];
-            if (id && !(cur && cur.num === id.num && cur.name === id.name && cur.cls === cls && cur.subject === subject && cur.term === id.term)) {
-                cur = { grade: id.grade || grade, cls, term: id.term, num: id.num, name: id.name, subject, page: b.page, y: id.y, lines: [] };
+            if (id && !(cur && cur.num === id.num && cur.name === id.name && cur.cls === (id.cls || cls) && cur.subject === subject && cur.term === id.term)) {
+                cur = { grade: id.grade || grade, cls: id.cls || cls, term: id.term, num: id.num, name: id.name, subject, page: b.page, y: id.y, lines: [] };
                 students.push(cur);
             }
             if (cur) cur.lines.push(b);
@@ -645,11 +656,15 @@ function rcPdfSetukRows(pages) {
                 const cells = rcPdfHeadCells(ln);
                 let ti = cells.findIndex((_, i) => /^(세부|특기|행동|종합|및)/.test(cells.slice(i).map(c => c.t).join('')));
                 if (ti <= 0) ti = cells.length - 1;
-                const cols = rcPdfIdCols(cells.slice(0, ti));
+                // 위아래 줄에 나뉘어 찍힌 머리글('학적 / 변동구분')도 학생 칸에 넣어 '재학' 같은 글자가 이름·본문에 섞이지 않게 함
+                const near = lines.filter(l => l !== ln && Math.abs(l.y - ln.y) < ln.words[0].h * 1.8 && l.text.length < 20)
+                    .flatMap(rcPdfHeadCells).filter(c => c.x1 <= cells[ti].x0 && !cells.some(h => h.x0 < c.x1 && c.x0 < h.x1));
+                const idCells = [...cells.slice(0, ti), ...near];
+                const cols = rcPdfIdCols(idCells);
                 title ||= cells.slice(ti).map(c => c.t).join('');
                 if (!cols) { H = null; continue; }
                 // 본문 시작 위치 = 학생 칸들 오른쪽에서 가장 흔한 줄 시작 위치 (그 앞 칸에 찍힌 '시간' 같은 글자는 본문이 아님)
-                const right = Math.max(...cells.slice(0, ti).map(c => c.x1)), starts = {};
+                const right = Math.max(...idCells.map(c => c.x1)), starts = {};
                 lines.forEach(l => { const f = l.y < ln.y && l.words.find(w => w.x > right + 2); if (f) starts[Math.round(f.x)] = (starts[Math.round(f.x)] || 0) + 1; });
                 const top = Object.entries(starts).sort((a, b) => b[1] - a[1])[0];
                 H = { cols, cut: top ? +top[0] - 1 : right + 3 };
@@ -657,10 +672,13 @@ function rcPdfSetukRows(pages) {
             }
             const cm = left && ln.text.length < 60 && ln.text.match(RC_CLASS_LINE);   // '일반계 3학년 13반'
             if (cm) { flush(block); block = []; grade = cm[1]; cls = cm[2]; continue; }
-            const sm = left && ln.text.match(/교\s*과\s*목\s*[:：]\s*(.+?)\s*(?:\(\d+\))?\s*$/);   // '교과목 : 국어(4)'
+            const sm = left && ln.text.match(RC_SUBJ_LINE);
             if (sm) { flush(block); block = []; subject = sm[1]; continue; }
+            const gl = left && rcGradeLine(ln.text);
+            if (gl) { flush(block); block = []; grade = gl; continue; }
             if (/^<.*>$/.test(rcNorm(ln.text))) { flush(block); block = []; cur = null; continue; }   // <진로 선택 과목>: 번호가 1번부터 다시
             if (/조회된\s*데이터가\s*없습니다/.test(ln.text)) continue;
+            if (/^\d{4}\.\d{1,2}\.\d{1,2}\.?$/.test(rcNorm(ln.text))) continue;   // 쪽 맨 위 출력 날짜 '2026.11.26.'
             if (H) block.push(ln);
         }
         flush(block);
