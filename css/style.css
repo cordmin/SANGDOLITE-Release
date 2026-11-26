@@ -385,9 +385,9 @@ td.excel-byte { background-color: #f1f5f9; padding: 12px 8px !important; }
 /* 한 문장씩 한 줄로: 줄바꿈(
 )을 그대로 보여 주고, 가장 긴 문장이 한 줄에 들어가게 창을 조금 넓힘 */
 .rc-fail-dialog { width: min(440px, calc(100vw - 32px)); }
-.rc-fail-title { display: inline-flex; align-items: center; gap: 6px; }
-.rc-fail-title svg { width: 22px; height: 22px; stroke-width: 2; color: #f04a4a; }
+.rc-fail-title { display: flex; justify-content: center; align-items: center; gap: 6px; }
 #rc-fail-msg { white-space: pre-line; }
+#rc-fail-msg mark { padding: 0 2px; color: inherit; background: linear-gradient(transparent 45%, #fde047 45%, #fde047 90%, transparent 90%); }
 .rc-fail-file { display: inline-block; max-width: 100%; margin-bottom: 10px; padding: 3px 12px; border-radius: 999px; background: #f1f5f9; font-size: 13px; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
 .rc-rounded-table { border: 1px solid #94a3b8; border-radius: 10px; overflow: hidden; }
 .rc-rounded-table table { border-collapse: separate; border-spacing: 0; }

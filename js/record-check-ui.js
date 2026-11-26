@@ -38,7 +38,7 @@ async function rcAddFiles(list) {
     for (const file of list) {
         if (loaded) { showToast(`파일은 하나만 불러올 수 있어서 '${loaded.name}'만 불러왔어요.`); break; }
         const isPdf = /\.pdf$/i.test(file.name);
-        if (!isPdf && !/\.xlsx?$/i.test(file.name)) { rcLoadFail(file.name, '엑셀(.xlsx, .xls)이나 PDF 파일만 읽을 수 있어요.\nNEIS(나이스)에서 내려받은 생활기록부 파일을 올려 주세요.'); continue; }
+        if (!isPdf && !/\.xlsx?$/i.test(file.name)) { rcLoadFail(file.name, RC_FORM_MSG); continue; }
         try {
             let records;
             if (isPdf) {
@@ -59,9 +59,7 @@ async function rcAddFiles(list) {
                 });
             }
             if (!records.length) {
-                rcLoadFail(file.name, isPdf
-                    ? 'NEIS(나이스)에서 출력한 생활기록부 PDF를 올려 주세요.'
-                    : "'성명' 칸이 있는 NEIS(나이스) 생활기록부 엑셀을 올려 주세요.");
+                rcLoadFail(file.name, RC_FORM_MSG);
                 continue;
             }
             loaded = { name: file.name, records, isPdf };
@@ -71,7 +69,7 @@ async function rcAddFiles(list) {
             rcResults = null;
             rcLoading(null);
         } catch (e) {
-            rcLoadFail(file.name, `파일을 여는 중에 문제가 생겼어요.\nNEIS(나이스)에서 출력한 생활기록부 엑셀이나 PDF를 올려 주세요.\n${e.message}`);
+            rcLoadFail(file.name, `${RC_FORM_MSG}\n${e.message}`);
         }
     }
     rcRenderFiles();
@@ -89,10 +87,15 @@ async function rcFixWraps(records) {
     return rcResolveWraps(records, known);
 }
 
+const RC_NEIS_PATH = "'NEIS → 업무메뉴 → 학교생활기록부'";
+const RC_FORM_MSG = RC_NEIS_PATH + "에서\n다운로드 받은 PDF 또는 엑셀 양식을 이용해주세요.";
 // 불러오기 실패 창: 어떤 파일인지와 무엇을 올리면 되는지 알려 줌
 function rcLoadFail(name, msg) {
     document.getElementById('rc-fail-file').textContent = name;
-    document.getElementById('rc-fail-msg').textContent = msg;
+    // 나이스 메뉴 길은 형광펜으로 칠함 (글은 textContent로만 넣음)
+    const [before, ...after] = msg.split(RC_NEIS_PATH), mark = document.createElement('mark');
+    mark.textContent = RC_NEIS_PATH;
+    document.getElementById('rc-fail-msg').replaceChildren(before, ...(after.length ? [mark, after.join(RC_NEIS_PATH)] : []));
     const dialog = document.getElementById('rc-fail-dialog');
     if (!dialog.open) dialog.showModal();
 }

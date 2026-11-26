@@ -244,20 +244,8 @@ function rcParseRows(rows, sheetName = '', fileName = '') {
     const headWords = new Set(headRows.flat().map(v => rcNorm(String(v ?? ''))).filter(Boolean));
     const data = rows.slice(headRow + 1);
 
-    // 글 칸: 머리글로 못 찾았으면 글이 가장 긴 칸
-    if (col.text == null) {
-        const total = {};
-        data.forEach(r => (r || []).forEach((v, c) => { if (c !== col.name) total[c] = (total[c] || 0) + String(v ?? '').length; }));
-        const best = Object.entries(total).sort((a, b) => b[1] - a[1])[0];
-        if (best) col.text = Number(best[0]);
-    }
-    if (col.name == null) {
-        const hits = {};
-        data.forEach(r => (r || []).forEach((v, c) => { if (/^[가-힣]{2,4}$/.test(String(v ?? '').trim())) hits[c] = (hits[c] || 0) + 1; }));
-        const best = Object.entries(hits).filter(([c]) => Number(c) !== col.text).sort((a, b) => b[1] - a[1])[0];
-        if (best) col.name = Number(best[0]);
-    }
-    if (col.text == null) return [];
+    // 나이스 양식은 '성명'과 '특기사항(종합의견 등)' 머리글이 꼭 있음. 없으면 짐작하지 않고 양식이 아니라고 봄
+    if (headRow < 0 || col.text == null) return [];
 
     const headText = headRow >= 0 ? (rows[headRow] || []).join(' ') : '';
     const sheetArea = rcGuessArea(headText.match(RC_HEAD.text)?.[0], sheetName, fileName);
